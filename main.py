@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
+import pandas as pd
+import os
 
-a = np.arange(-5, 5)
-print(a)
-print(np.abs(a))
-print(a.dtype)
+from trading.collector.constant import (stock_basic_file, stock_history_path,
+                                        stock_tradedate_file)
+
 
 # 设置字体
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 黑体
@@ -29,3 +31,12 @@ plt.rcParams['axes.unicode_minus'] = False
 # ax2 = fig.add_subplot(2, 2, 4)
 # ax2.plot([1, 2, 3, 4], [2, 3, 7, 1])
 # plt.show()
+
+# 5日,30日均线
+df = pd.read_csv(os.path.join(stock_history_path, 'sh600519.csv'))
+df.index = pd.DatetimeIndex(df['date'])
+ma5 = df['close'].rolling(5).mean()
+ma30 = df['close'].rolling(30).mean()
+plt.plot(ma5)
+plt.plot(ma30)
+plt.show()
