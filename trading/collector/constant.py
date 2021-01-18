@@ -19,3 +19,5 @@ stock_basic_file = os.path.join(stock_path, stock_basic_file_name)
 stock_tradedate_file_name = "stock_tradedate.csv"
 
 stock_tradedate_file = os.path.join(stock_path, stock_tradedate_file_name)
+
+stock_n2s_path = os.path.join(stock_path, "n2s")

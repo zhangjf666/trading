@@ -33,10 +33,33 @@ plt.rcParams['axes.unicode_minus'] = False
 # plt.show()
 
 # 5日,30日均线
-df = pd.read_csv(os.path.join(stock_history_path, 'sh600519.csv'))
-df.index = pd.DatetimeIndex(df['date'])
-ma5 = df['close'].rolling(5).mean()
-ma30 = df['close'].rolling(30).mean()
-plt.plot(ma5)
-plt.plot(ma30)
+# df = pd.read_csv(os.path.join(stock_history_path, 'sh600519.csv'))
+# df.index = pd.DatetimeIndex(df['date'])
+# ma5 = df['close'].rolling(5).mean()
+# ma30 = df['close'].rolling(30).mean()
+# plt.plot(ma5)
+# plt.plot(ma30)
+# plt.show()
+
+# 收益曲线
+df = pd.read_csv(os.path.join(stock_history_path, 'sh000300.csv'), index_col=0)
+df.index = pd.DatetimeIndex(df.index)
+df = df['2019-01-01':'2019-12-31']
+df['ret'] = df['close']/df['close'].shift(1) - 1 
+plt.plot(df.index, df['ret'])
 plt.show()
+# 收益率
+df = df['close']
+total_trading_day = len(df.index)
+print(total_trading_day)
+annual_trading_day = 252
+final_net_worth = df.iloc[total_trading_day-1]
+print(final_net_worth)
+initial_net_worth = df.iloc[0]
+print(initial_net_worth)
+
+total_ret_rate = final_net_worth / initial_net_worth - 1
+print(total_ret_rate)
+annual_ret_rate = pow((final_net_worth / initial_net_worth),
+                      (annual_trading_day / total_trading_day)) - 1
+print(annual_ret_rate)
