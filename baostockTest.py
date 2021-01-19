@@ -22,17 +22,8 @@ def get_next_tradedate(date):
     return pd.Timestamp(tf['trade_date'].values[0]).to_pydatetime()
 
 
-# 登录
-sc.bao_stock_login()
-
-# 获取A股所有股票代码
-# sc.save_stock_basic()
-
-# 遍历获取A股所有股票历史行情数据
-# 加载所有股票代码
-basic = pd.read_csv(stock_basic_file)
-basic = basic[basic['status'] == 1]
-for code in basic['code']:
+# 更新某个股票的历史行情数据
+def update_stock_history_k_data(code):
     file_name = os.path.join(stock_history_path, code + ".csv")
     exists = os.path.exists(file_name)
     start_date = '1990-01-01'
@@ -45,30 +36,29 @@ for code in basic['code']:
         sdt = get_next_tradedate(sdt)
         # 下个交易日大于当天,说明还没到,不获取数据
         if (sdt.date() > datetime.datetime.today().date()):
-            continue
+            return
         start_date = (sdt + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     sc.save_history_k_data(code,
                            start_date=start_date,
                            adjustflag="2",
                            save_header=bool(1 - exists))
-    time.sleep(2)
 
-# code = "sh600519"
-# file_name = os.path.join(stock_history_path, code+".csv")
-# exists = os.path.exists(file_name)
-# start_date = '1990-01-01'
-# if(exists):
-#     data = pd.read_csv(file_name)
-#     data.index = pd.DatetimeIndex(data['date'])
-#     data = data.sort_index(ascending=False)
-#     start_date = data['date'].values[0]
-#     sdt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-#     if(sdt.today() >= datetime.datetime.today()):
-#         continue
-#     start_date = (sdt + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-# sc.save_history_k_data(code,
-#                        start_date=start_date,
-#                        adjustflag="2",
-#                        save_header=bool(1-exists))
+
+# 登录
+sc.bao_stock_login()
+
+# 获取A股所有股票代码
+# sc.save_stock_basic()
+
+# 遍历获取A股所有股票历史行情数据
+# 加载所有股票代码
+# basic = pd.read_csv(stock_basic_file)
+# basic = basic[basic['status'] == 1]
+# for code in basic['code']:
+#     update_stock_history_k_data(code)
+#     time.sleep(2)
+
+# 更新某个股票
+update_stock_history_k_data('sh000300')
 # 退出
 sc.bao_stock_logout()

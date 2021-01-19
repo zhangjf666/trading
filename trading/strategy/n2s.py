@@ -38,7 +38,7 @@ def show_n2s_sign(code=None, start_date='2017-01-01', end_date=None):
         end_date = datetime.datetime.today().strftime("%Y-%m-%d")
     df = df[start_date:end_date]
     plt.plot(df.index, df['up'], color="green", label="up_line")
-    plt.plot(df.index, df['down'], color="red", label="down_line")
-    plt.plot(df.index, df['当日成交净买额'], color="black", label="net_buy")
+    plt.plot(df.index, df['down'], color="black", label="down_line")
+    plt.plot(df.index, df['当日成交净买额'], color="red", label="net_buy")
     plt.legend()
     plt.show()
