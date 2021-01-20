@@ -9,7 +9,7 @@ import pandas as pd
 import os
 import akshare as ak
 
-from trading.collector.constant import *
+import trading.collector.constant as cons
 
 
 # 登录,退出baostock
@@ -61,11 +61,12 @@ def save_stock_basic(code=None, code_name=None):
     result = pd.DataFrame(rs.data, columns=rs.fields)
     result['code'] = result['code'].str[:2] + result['code'].str[3:]
     # 结果集输出到csv文件
-    result.to_csv(stock_basic_file, encoding="utf-8", index=False)
+    result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
 
 
 # 获取股票历史行情
-history_data_filed = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTM,pbMRQ,psTTM,pcfNcfTTM,isST"
+history_data_filed = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,\
+    pctChg,peTTM,pbMRQ,psTTM,pcfNcfTTM,isST"
 
 
 def save_history_k_data(code,
@@ -101,13 +102,33 @@ def save_history_k_data(code,
     # 结果集输出到csv文件
     if (not save_header):
         save_header = None
-    result.to_csv(os.path.join(stock_history_path, code + ".csv"),
+    result.to_csv(os.path.join(cons.stock_history_path, code + ".csv"),
                   encoding="utf-8",
                   index=False,
                   mode='a',
                   header=save_header)
 
-
+# 保存交易日历
 def save_tradeday():
     df = ak.tool_trade_date_hist_sina()
-    df.to_csv(stock_tradedate_file, encoding="utf-8", index=False)
+    df.to_csv(cons.stock_tradedate_file, encoding="utf-8", index=False)
+
+# 保存北向资金信息
+def save_n2s():
+    # 北向流入
+    hgt = ak.stock_em_hsgt_hist('沪股通')
+    hgt = hgt.iloc[:, 0:7]
+    hgt.to_csv(os.path.join(cons.stock_n2s_path, 'hgt.csv'), encoding="utf-8", index=False)
+    sgt = ak.stock_em_hsgt_hist('深股通')
+    sgt = sgt.iloc[:, 0:7]
+    sgt.to_csv(os.path.join(cons.stock_n2s_path, 'sgt.csv'), encoding="utf-8", index=False)
+    # 合并北向
+    pd.to_datetime(hgt['日期'])
+    hgt = hgt.set_index(['日期'])
+    pd.to_datetime(sgt['日期'])
+    sgt = sgt.set_index(['日期'])
+    n2s = hgt.add(sgt)
+    n2s = n2s.sort_index(ascending=False)
+    n2s = n2s.dropna()
+    n2s = n2s.reset_index()
+    n2s = n2s.to_csv(os.path.join(cons.stock_n2s_path, 'n2s.csv'), encoding="utf-8", index=False)

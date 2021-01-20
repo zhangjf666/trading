@@ -20,9 +20,9 @@ np.set_printoptions(threshold=np.inf)
 # 若想不以科学计数显示:
 np.set_printoptions(suppress=True)
 
-start_date = '2015-12-08'
-end_date = '2020-08-12'
-code = 'sz399006'
+start_date = '2019-01-01'
+end_date = '2019-12-31'
+code = 'sh000300'
 # 生成北向买卖点
 n2s = pd.read_csv(os.path.join(stock_n2s_path, 'n2s.csv'), encoding='utf-8')
 n2s.index = pd.DatetimeIndex(n2s['日期'])
@@ -49,6 +49,7 @@ df = pd.read_csv(os.path.join(stock_history_path, code + '.csv'), index_col=0)
 df.index = pd.DatetimeIndex(df.index)
 df = df[start_date:end_date]
 df['ret'] = df['close'] / df['close'].shift(1) - 1
+print(df['ret'])
 df.loc[df.index[0], 'ret'] = 0
 n2s = pd.merge(n2s, df, how='inner', left_index=True, right_index=True)
 n2s.loc[n2s.index[0], 'c_ret'] = 0
@@ -99,30 +100,30 @@ print("策略最大资金回撤%5.2f%%从%s开始至%s结束" %
 
 # 收益率和年化收益率
 # df = df['close']
-total_trading_day = len(df.index)
-print(total_trading_day)
-annual_trading_day = 250
-final_net_worth = df.iloc[total_trading_day - 1]['close']
-print(final_net_worth)
-initial_net_worth = df.iloc[0]['close']
-print(initial_net_worth)
+# total_trading_day = len(df.index)
+# print(total_trading_day)
+# annual_trading_day = 250
+# final_net_worth = df.iloc[total_trading_day - 1]['close']
+# print(final_net_worth)
+# initial_net_worth = df.iloc[0]['close']
+# print(initial_net_worth)
 
-total_ret_rate = final_net_worth / initial_net_worth - 1
-print(total_ret_rate)
-annual_ret_rate = pow((final_net_worth / initial_net_worth),
-                      (annual_trading_day / total_trading_day)) - 1
-print(annual_ret_rate)
+# total_ret_rate = final_net_worth / initial_net_worth - 1
+# print(total_ret_rate)
+# annual_ret_rate = pow((final_net_worth / initial_net_worth),
+#                       (annual_trading_day / total_trading_day)) - 1
+# print(annual_ret_rate)
 
-# 计算最大回测
-# expanding()计算资金曲线当前的滚动最高值
-df['max_close'] = df['close'].expanding().max()
-# 计算资金曲线在滚动最高值之后所回撤的百分比
-df['per_close'] = df['close'] / df['max_close']
-min_point_total = df.sort_values(
-    by=['per_close']).iloc[[0], df.columns.get_loc('per_close')]
-print(min_point_total)
-max_point_total = df[df.index <= min_point_total.index[0]].sort_values(
-    by=['close'], ascending=False).iloc[[0], df.columns.get_loc('close')]
-print("最大资金回撤%5.2f%%从%s开始至%s结束" %
-      ((1 - min_point_total.values), max_point_total.index[0],
-       min_point_total.index[0]))
+# # 计算最大回测
+# # expanding()计算资金曲线当前的滚动最高值
+# df['max_close'] = df['close'].expanding().max()
+# # 计算资金曲线在滚动最高值之后所回撤的百分比
+# df['per_close'] = df['close'] / df['max_close']
+# min_point_total = df.sort_values(
+#     by=['per_close']).iloc[[0], df.columns.get_loc('per_close')]
+# print(min_point_total)
+# max_point_total = df[df.index <= min_point_total.index[0]].sort_values(
+#     by=['close'], ascending=False).iloc[[0], df.columns.get_loc('close')]
+# print("最大资金回撤%5.2f%%从%s开始至%s结束" %
+#       ((1 - min_point_total.values), max_point_total.index[0],
+#        min_point_total.index[0]))
