@@ -132,3 +132,7 @@ def save_n2s():
     n2s = n2s.dropna()
     n2s = n2s.reset_index()
     n2s = n2s.to_csv(os.path.join(cons.stock_n2s_path, 'n2s.csv'), encoding="utf-8", index=False)
+
+
+if __name__ == '__main__':
+    save_tradeday()

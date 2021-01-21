@@ -10,11 +10,6 @@ import os
 import datetime
 
 import trading.collector.constant as cons
-"""
-1.当日北向资金净买入 > 过去252个交易日的北向资金净买入均值 + 2倍标准差,则第二个交易日全仓买入沪深300
-2.当日北向资金净买入 < 过去252个交易日的北向资金净买入均值 - 2倍标准差,则第二个交易日清仓卖出沪深300
-3.北向开始时间2016-12-05日, 252个交易日大约一年,最早能开始回测的时间大概在2018-01-01
-"""
 
 
 # 收益率计算
@@ -145,6 +140,11 @@ def get_n2s_strategy_data(code,
     ]]
 
 
+"""
+1.当日北向资金净买入 > 过去252个交易日的北向资金净买入均值 + 2倍标准差,则第二个交易日全仓买入沪深300
+2.当日北向资金净买入 < 过去252个交易日的北向资金净买入均值 - 2倍标准差,则第二个交易日清仓卖出沪深300
+3.北向开始时间2016-12-05日, 252个交易日大约一年,最早能开始回测的时间大概在2018-01-01
+"""
 # 北向资金回测收益率
 def get_n2s_strategy_summary(code,
                              start_date='2017-01-01',
@@ -190,3 +190,7 @@ def get_n2s_strategy_summary(code,
     result['s_max_drawdown'] = np.round((1 - s_min_point_total.values) * 100,
                                         2)
     return pd.DataFrame(result)
+
+
+if __name__ == '__main__':
+    show_n2s_sign(start_date='2020-01-01')

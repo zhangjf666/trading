@@ -5,6 +5,7 @@ Desc: 策略测试
 """
 import pandas as pd
 import os
+import trading.strategy.n2s
 import trading.strategy.n2s as tsn
 import trading.collector.constant as cons
 import matplotlib.pyplot as plt
@@ -14,7 +15,7 @@ plt.rcParams['font.sans-serif'] = ['SimHei']  # 黑体
 plt.rcParams['axes.unicode_minus'] = False
 
 # 北向资金买入卖出指数
-# tsn.show_n2s_sign(start_date='2020-01-01', period=50)
+tsn.show_n2s_sign(start_date='2020-01-01')
 
 start_date = '2019-01-01'
 end_date = '2019-12-31'
@@ -34,10 +35,3 @@ code = 'sh000300'
 # 北向资金回测指数总计
 # n2s = tsn.get_n2s_strategy_summary(code, start_date, end_date)
 # print(n2s)
-
-df = pd.read_csv(os.path.join(cons.stock_history_path, "sh000300.csv"))
-df.index = pd.DatetimeIndex(df['date'])
-df = df[start_date:end_date]
-ss = tsn.calc_max_drawdown(df)
-print(ss)
-print(type(ss))
