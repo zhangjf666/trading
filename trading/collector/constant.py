@@ -21,3 +21,18 @@ stock_tradedate_file_name = "stock_tradedate.csv"
 stock_tradedate_file = os.path.join(stock_path, stock_tradedate_file_name)
 
 stock_n2s_path = os.path.join(stock_path, "n2s")
+
+fund_path = os.path.join(save_root_path, "fund")
+
+fund_basic_file_name = "fund_basic.csv"
+
+fund_basic_file = os.path.join(fund_path, fund_basic_file_name)
+
+fund_open_fund_rank_file_name = "open_fund_rank.csv"
+
+fund_open_fund_rank_file = os.path.join(fund_path, fund_open_fund_rank_file_name)
+
+fund_exchange_rank_file_name = "exchange_rank.csv"
+
+fund_exchange_rank_file = os.path.join(fund_path, fund_exchange_rank_file_name)
+
