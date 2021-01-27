@@ -108,20 +108,26 @@ def save_history_k_data(code,
                   mode='a',
                   header=save_header)
 
+
 # 保存交易日历
 def save_tradeday():
     df = ak.tool_trade_date_hist_sina()
     df.to_csv(cons.stock_tradedate_file, encoding="utf-8", index=False)
+
 
 # 保存北向资金信息
 def save_n2s():
     # 北向流入
     hgt = ak.stock_em_hsgt_hist('沪股通')
     hgt = hgt.iloc[:, 0:7]
-    hgt.to_csv(os.path.join(cons.stock_n2s_path, 'hgt.csv'), encoding="utf-8", index=False)
+    hgt.to_csv(os.path.join(cons.stock_n2s_path, 'hgt.csv'),
+               encoding="utf-8",
+               index=False)
     sgt = ak.stock_em_hsgt_hist('深股通')
     sgt = sgt.iloc[:, 0:7]
-    sgt.to_csv(os.path.join(cons.stock_n2s_path, 'sgt.csv'), encoding="utf-8", index=False)
+    sgt.to_csv(os.path.join(cons.stock_n2s_path, 'sgt.csv'),
+               encoding="utf-8",
+               index=False)
     # 合并北向
     pd.to_datetime(hgt['日期'])
     hgt = hgt.set_index(['日期'])
@@ -131,7 +137,9 @@ def save_n2s():
     n2s = n2s.sort_index(ascending=False)
     n2s = n2s.dropna()
     n2s = n2s.reset_index()
-    n2s = n2s.to_csv(os.path.join(cons.stock_n2s_path, 'n2s.csv'), encoding="utf-8", index=False)
+    n2s = n2s.to_csv(os.path.join(cons.stock_n2s_path, 'n2s.csv'),
+                     encoding="utf-8",
+                     index=False)
 
 
 if __name__ == '__main__':

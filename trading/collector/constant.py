@@ -36,3 +36,4 @@ fund_exchange_rank_file_name = "exchange_rank.csv"
 
 fund_exchange_rank_file = os.path.join(fund_path, fund_exchange_rank_file_name)
 
+fund_stock_hold_path = os.path.join(fund_path, "stock_hold")
