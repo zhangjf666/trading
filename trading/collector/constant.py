@@ -22,6 +22,8 @@ stock_tradedate_file = os.path.join(stock_path, stock_tradedate_file_name)
 
 stock_n2s_path = os.path.join(stock_path, "n2s")
 
+stock_quarter_path = os.path.join(stock_path, "quarter")
+
 fund_path = os.path.join(save_root_path, "fund")
 
 fund_basic_file_name = "fund_basic.csv"

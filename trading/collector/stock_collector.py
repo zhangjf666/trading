@@ -8,6 +8,8 @@ import baostock as bs
 import pandas as pd
 import os
 import akshare as ak
+import dateutil
+import datetime
 
 import trading.collector.constant as cons
 
@@ -33,6 +35,15 @@ def from_sina_code(code):
     return "".join(sl)
 
 
+# 获取baostock数据
+def get_baostock_data(rs):
+    if (rs.error_code != '0'):
+        raise Exception(rs.error_msg)
+    # pandas获取结果集
+    result = pd.DataFrame(rs.data, columns=rs.fields)
+    return result
+
+
 # 获取A股票基本资料
 def save_stock_basic(code=None, code_name=None):
     """
@@ -54,11 +65,7 @@ def save_stock_basic(code=None, code_name=None):
     # 获取历史K线数据
     # 详细指标参数，参见“历史行情指标参数”章节
     rs = bs.query_stock_basic(code, code_name)
-
-    if (rs.error_code != '0'):
-        raise Exception(rs.error_msg)
-    # pandas获取结果集
-    result = pd.DataFrame(rs.data, columns=rs.fields)
+    result = get_baostock_data(rs)
     result['code'] = result['code'].str[:2] + result['code'].str[3:]
     # 结果集输出到csv文件
     result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
@@ -94,10 +101,7 @@ def save_history_k_data(code,
         bao_code, fields, start_date, end_date, frequency,
         adjustflag)  # frequency="d"取日k线，adjustflag="3"默认不复权
 
-    if (rs.error_code != '0'):
-        raise Exception(rs.error_msg)
-    # pandas获取结果集
-    result = pd.DataFrame(rs.data, columns=rs.fields)
+    result = get_baostock_data(rs)
     result['code'] = result['code'].str[:2] + result['code'].str[3:]
     # 结果集输出到csv文件
     if (not save_header):
@@ -142,5 +146,85 @@ def save_n2s():
                      index=False)
 
 
+# 季频资料获取
+def collect_quarter_stock_data(code, year, quarter):
+    # 合并季频指标
+    def merge_data(df, bs_result):
+        result = get_baostock_data(bs_result)
+        result.set_index("statDate", inplace=True)
+        cols_to_use = result.columns.difference(df.columns)
+        df = pd.merge(df,
+                      result[cols_to_use],
+                      how="outer",
+                      left_index=True,
+                      right_index=True)
+        return df
+
+    try:
+        # 季频盈利能力
+        rs_profit = bs.query_profit_data(code, year, quarter)
+        result = get_baostock_data(rs_profit)
+        df = result
+        df.set_index("statDate", inplace=True)
+        # 季频营运能力
+        rs = bs.query_operation_data(code, year, quarter)
+        df = merge_data(df, rs)
+        # 季频成长能力
+        rs = bs.query_growth_data(code, year, quarter)
+        df = merge_data(df, rs)
+        # 季频偿债能力
+        rs = bs.query_balance_data(code, year, quarter)
+        df = merge_data(df, rs)
+        # 季频现金流量
+        rs = bs.query_cash_flow_data(code, year, quarter)
+        df = merge_data(df, rs)
+        # 季频杜邦指数
+        rs = bs.query_dupont_data(code, year, quarter)
+        df = merge_data(df, rs)
+        df.reset_index(inplace=True)
+    except Exception as e:
+        print(e)
+        raise e
+    return df
+
+
+# 季频资料保存
+def save_quarter_stock_data(code):
+    fname = os.path.join(cons.stock_quarter_path, code + ".csv")
+    exists = os.path.exists(fname)
+    start_date = datetime.date(2000, 1, 1)
+    fdf = None
+    if (exists):
+        fdf = pd.read_csv(fname)
+        fdf.index = pd.DatetimeIndex(fdf["statDate"])
+        fdf.sort_index()
+        start_date = dateutil.parser.parse(fdf["statDate"].values[-1])
+    # 循环获取季频资料
+    bao_code = from_sina_code(code)
+    now_date = datetime.datetime.now()
+    while (start_date.year != now_date.year or
+           pd.Timestamp(start_date).quarter != pd.Timestamp(now_date).quarter):
+        start_date = start_date + dateutil.relativedelta.relativedelta(
+            months=3)
+        rs = collect_quarter_stock_data(bao_code, start_date.year,
+                                        pd.Timestamp(start_date).quarter)
+        if (rs.empty):
+            continue
+        rs['code'] = rs['code'].str[:2] + rs['code'].str[3:]
+        if (fdf is None):
+            fdf = rs
+        else:
+            fdf = pd.concat([fdf, rs])
+    # 结果集输出到csv文件
+    save_header = True if not exists else None
+    fdf.to_csv(fname,
+               encoding="utf-8",
+               index=False,
+               mode='a',
+               header=save_header)
+
+
 if __name__ == '__main__':
-    save_tradeday()
+    bao_stock_login()
+    save_quarter_stock_data("sh600519")
+    bao_stock_logout()

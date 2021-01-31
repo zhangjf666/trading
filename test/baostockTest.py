@@ -59,6 +59,13 @@ sc.bao_stock_login()
 #     time.sleep(2)
 
 # 更新某个股票
-update_stock_history_k_data('sh000300')
+# update_stock_history_k_data('sh000300')
+
+# 季频数据
+basic = pd.read_csv(stock_basic_file)
+basic = basic[(basic['status'] == 1) & (basic['type'] == 1)]
+for code in basic['code']:
+    sc.save_quarter_stock_data(code)
+    time.sleep(2)
 # 退出
 sc.bao_stock_logout()
