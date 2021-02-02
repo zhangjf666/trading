@@ -5,6 +5,8 @@ Desc: 数据获取定义
 """
 import os
 
+# csv文件类型
+file_type_csv = ".csv"
 # 文件保存路径
 save_root_path = "./.data/"
 
@@ -23,6 +25,8 @@ stock_tradedate_file = os.path.join(stock_path, stock_tradedate_file_name)
 stock_n2s_path = os.path.join(stock_path, "n2s")
 
 stock_quarter_path = os.path.join(stock_path, "quarter")
+
+stock_forecast_path = os.path.join(stock_path, "forecast")
 
 fund_path = os.path.join(save_root_path, "fund")
 

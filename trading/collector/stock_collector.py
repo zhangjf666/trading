@@ -224,7 +224,16 @@ def save_quarter_stock_data(code):
                header=save_header)
 
 
+# 业绩预告
+def save_forecast(date):
+    """
+    date 注意取值,只能为每季度末日期,例如,2020-03-31,2020-06-30,2020-09-30,2020-12-31
+    """
+    df = ak.stock_em_yjyg(date)
+    df.to_csv(os.path.join(cons.stock_forecast_path, date + cons.file_type_csv), encoding="utf-8", index=False)
+
+
 if __name__ == '__main__':
-    bao_stock_login()
-    save_quarter_stock_data("sh600519")
-    bao_stock_logout()
+    # bao_stock_login()
+    save_forecast("2021-03-31")
+    # bao_stock_logout()
