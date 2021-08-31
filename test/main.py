@@ -1,14 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import datetime
-import pandas as pd
-import os
-import sys
 import akshare as ak
+import pandas as pd
 
-from trading.collector.constant import (stock_basic_file, stock_history_path,
-                                        stock_tradedate_file, stock_n2s_path)
+# 显示所有列
+pd.set_option('display.max_columns', None)
+# 显示所有行
+pd.set_option('display.max_rows', None)
 
-
-df = ak.stock_em_yjyg(date="2020-12-31")
+df = ak.stock_info_a_code_name()
 print(df)

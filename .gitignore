@@ -1,6 +1,7 @@
 /.vscode
 **/__pycache__
 /.data
+/.logs
 *.pyc
 /.ipynb_checkpoints
 *.ipynb
