@@ -29,7 +29,11 @@ def save_stock_basic():
     code	证券代码
     name	证券名称
     """
-    result = ak.stock_info_a_code_name()
+    result = ak.stock_zh_a_spot_em()
+    result.dropna(inplace=True)
+    result = result[['代码', '名称']]
+    result.columns = ['code', 'name']
+    result.sort_values(by='code', inplace=True)
     # 结果集输出到csv文件
     result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
 
