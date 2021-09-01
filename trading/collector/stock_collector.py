@@ -7,6 +7,7 @@ Desc: 股票数据获取
 import pandas as pd
 import os
 import akshare as ak
+import datetime
 
 import trading.collector.constant as cons
 
@@ -19,58 +20,6 @@ def from_sina_code(code):
     sl = list(code)
     sl.insert(2, ".")
     return "".join(sl)
-
-
-# 采集A股票基本资料
-def save_stock_basic():
-    """
-    获取A股票基本资料
-    返回数据说明
-    code	证券代码
-    name	证券名称
-    """
-    result = ak.stock_zh_a_spot_em()
-    result.dropna(inplace=True)
-    result = result[['代码', '名称']]
-    result.columns = ['code', 'name']
-    result.sort_values(by='code', inplace=True)
-    # 结果集输出到csv文件
-    result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
-
-
-# 获取A股历史K线数据
-def save_history_k_data(code,
-                        start_date='19800101',
-                        end_date='21211231',
-                        adjust=""):
-    """
-    获取A股历史K线数据
-    入参
-    code：股票代码，6位数字代码，此参数不可为空；
-    start_date：开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
-    end_date：结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
-    adjust：复权类型，默认不复权,qfq:前复权,hfq:后复权
-    """
-
-    file_name = os.path.join(cons.stock_history_path, code + ".csv")
-    exists = os.path.exists(file_name)
-    start_date = '19800101'
-    data = None
-    if (exists):
-        data = pd.read_csv(file_name)
-        data.index = pd.DatetimeIndex(data['日期'])
-        data = data.sort_index()
-        start_date = data['日期'].values[-1].replace('-', '')
-        # 去掉最后一行数据
-        data = data[:-1]
-        data.reset_index(inplace=True, drop=True)
-    result = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
-    if(data is not None):
-        data = pd.concat([data, result])
-    else:
-        data = result
-    # 结果集输出到csv文件
-    data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
 
 
 # 保存交易日历
@@ -92,6 +41,87 @@ def next_trade_date(date):
 def is_trade_date(date):
     tf = pd.read_csv(cons.stock_tradedate_file)
     return date in tf['trade_date'].values
+
+
+# 采集A股票基本资料
+def save_stock_basic():
+    """
+    获取A股票基本资料
+    返回数据说明
+    code	证券代码
+    name	证券名称
+    """
+    result = ak.stock_zh_a_spot_em()
+    result.dropna(inplace=True)
+    result = result[['代码', '名称']]
+    result.columns = ['code', 'name']
+    result.sort_values(by='code', inplace=True)
+    # 结果集输出到csv文件
+    result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
+
+
+# 获取A股历史K线数据(全采集)
+def save_history_k_data(code,
+                        start_date='19800101',
+                        end_date='21211231',
+                        adjust=""):
+    """
+    获取A股历史K线数据
+    入参
+    code：股票代码，6位数字代码，此参数不可为空；
+    start_date：开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
+    end_date：结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
+    adjust：复权类型，默认不复权,qfq:前复权,hfq:后复权
+    """
+
+    # file_name = os.path.join(cons.stock_history_path, code + ".csv")
+    # exists = os.path.exists(file_name)
+    data = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
+    # if (exists):
+    #     data = pd.read_csv(file_name)
+    #     data.index = pd.DatetimeIndex(data['日期'])
+    #     data = data.sort_index()
+    #     start_date = data['日期'].values[-1].replace('-', '')
+    #     # 去掉最后一行数据
+    #     data = data[:-1]
+    #     data.reset_index(inplace=True, drop=True)
+    # result = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
+    # if(data is not None):
+    #     data = pd.concat([data, result])
+    # else:
+    #     data = result
+    # 结果集输出到csv文件
+    data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
+
+
+# 每日更新股票数据
+def update_k_data_daliy():
+    # 判断是否是交易日并且是开盘之后,开盘之前获取的是昨日的数据,会有问题
+    today = datetime.datetime.today()
+    todayStr = today.strftime('%Y-%m-%d')
+    isTradeDay = is_trade_date(todayStr)
+    isTradeTime = int(today.strftime('%H%M%S')) - int(datetime.time(9, 30, 0).strftime('%H%M%S')) > 0
+    if not (isTradeDay and isTradeTime):
+        print('当日交易未开始,不进行更新')
+        return
+    df = ak.stock_zh_a_spot_em()
+    df.dropna(inplace=True)
+    df = df[['代码', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率']]
+    df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
+    df.insert(1, '日期', today.strftime('%Y-%m-%d'))
+    for index in df.index:
+        row = df.iloc[index, :]
+        code = row['代码']
+        row = row.drop('代码')
+        file_name = os.path.join(cons.stock_history_path, code + ".csv")
+        exists = os.path.exists(file_name)
+        data = pd.DataFrame(columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率'])
+        if(exists):
+            data = pd.read_csv(file_name)
+            data = data[~(data['日期'] == todayStr)]
+        data = data.append(row)
+        # 结果集输出到csv文件
+        data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
 
 
 # 保存北向资金信息
@@ -131,4 +161,4 @@ def save_forecast(date):
 
 
 if __name__ == '__main__':
-    save_forecast('20210630')
+    save_history_k_data('600519', adjust='qfq')
