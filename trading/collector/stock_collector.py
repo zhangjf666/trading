@@ -10,6 +10,8 @@ import akshare as ak
 import datetime
 
 import trading.collector.constant as cons
+import trading.api.eastmoney as tae
+from trading.config.logger import logger
 
 
 def to_sina_code(code):
@@ -51,7 +53,7 @@ def save_stock_basic():
     code	证券代码
     name	证券名称
     """
-    result = ak.stock_zh_a_spot_em()
+    result = tae.stock_zh_a_spot_em()
     result.dropna(inplace=True)
     result = result[['代码', '名称']]
     result.columns = ['code', 'name']
@@ -102,26 +104,29 @@ def update_k_data_daliy():
     isTradeDay = is_trade_date(todayStr)
     isTradeTime = int(today.strftime('%H%M%S')) - int(datetime.time(9, 30, 0).strftime('%H%M%S')) > 0
     if not (isTradeDay and isTradeTime):
-        print('当日交易未开始,不进行更新')
+        logger.warning('当日交易未开始,不进行更新')
         return
-    df = ak.stock_zh_a_spot_em()
+    df = tae.stock_zh_a_spot_em()
     df.dropna(inplace=True)
-    df = df[['代码', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率']]
+    df = df[['代码', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
     df.insert(1, '日期', today.strftime('%Y-%m-%d'))
+    logger.info('更新每日股票数据开始.')
     for index in df.index:
-        row = df.iloc[index, :]
-        code = row['代码']
+        row = df.loc[index, :]
+        code = getattr(row, '代码')
         row = row.drop('代码')
         file_name = os.path.join(cons.stock_history_path, code + ".csv")
         exists = os.path.exists(file_name)
-        data = pd.DataFrame(columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率'])
+        data = pd.DataFrame(columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比'])
         if(exists):
             data = pd.read_csv(file_name)
             data = data[~(data['日期'] == todayStr)]
         data = data.append(row)
         # 结果集输出到csv文件
         data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
+        logger.info(code + ':更新成功.')
+    logger.info('更新每日股票数据结束.')
 
 
 # 保存北向资金信息

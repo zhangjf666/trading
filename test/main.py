@@ -6,5 +6,5 @@ pd.set_option('display.max_columns', None)
 # 显示所有行
 pd.set_option('display.max_rows', None)
 
-df = ak.stock_info_a_code_name()
-print(df)
+df = ak.stock_zh_a_spot_em()
+# print(df)
