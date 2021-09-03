@@ -108,17 +108,16 @@ def update_k_data_daliy():
         return
     df = tae.stock_zh_a_spot_em()
     df.dropna(inplace=True)
-    df = df[['代码', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
+    df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
     df.insert(1, '日期', today.strftime('%Y-%m-%d'))
     logger.info('更新每日股票数据开始.')
     for index in df.index:
         row = df.loc[index, :]
         code = getattr(row, '代码')
-        row = row.drop('代码')
         file_name = os.path.join(cons.stock_history_path, code + ".csv")
         exists = os.path.exists(file_name)
-        data = pd.DataFrame(columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比'])
+        data = pd.DataFrame(columns=['日期', '代码', '名称', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比'])
         if(exists):
             data = pd.read_csv(file_name)
             data = data[~(data['日期'] == todayStr)]
