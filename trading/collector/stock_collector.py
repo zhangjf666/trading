@@ -60,6 +60,7 @@ def save_stock_basic():
     result.sort_values(by='code', inplace=True)
     # 结果集输出到csv文件
     result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
+    logger.info('A股票基本资料采集成功.')
 
 
 # 获取A股历史K线数据(全采集)
@@ -119,7 +120,7 @@ def update_k_data_daliy():
         exists = os.path.exists(file_name)
         data = pd.DataFrame(columns=['日期', '代码', '名称', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比'])
         if(exists):
-            data = pd.read_csv(file_name)
+            data = pd.read_csv(file_name, dtype={'代码': str})
             data = data[~(data['日期'] == todayStr)]
         data = data.append(row)
         # 结果集输出到csv文件

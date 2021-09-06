@@ -8,7 +8,7 @@ import os
 # csv文件类型
 file_type_csv = ".csv"
 # 文件保存路径
-save_root_path = "./.data/"
+save_root_path = "/python/data/trading/.data/"
 
 stock_path = os.path.join(save_root_path, "stock")
 

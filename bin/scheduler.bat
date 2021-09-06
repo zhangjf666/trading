@@ -1,0 +1,1 @@
+python -i ..\trading\scheduler\collectScheduler.py
