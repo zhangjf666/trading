@@ -37,7 +37,10 @@ def selectOversoldStock(publicDays=180, maxDrawdown=60):
             stocks = stocks.append(stock, ignore_index=True)
     # 按流通市值排序
     stocks.sort_values(by='流通市值', inplace=True)
-    stocks.to_csv(os.path.join(scons.strategy_path, 'over_sold_new_stock' + scons.file_type_csv), mode='a', encoding="utf-8", index=False)
+    path = os.path.join(scons.strategy_path, "over_sold_new_stock")
+    if not os.path.exists(path):
+        os.mkdir(path)
+    stocks.to_csv(os.path.join(path, 'stock' + scons.file_type_csv), mode='a', encoding="utf-8", index=False)
 
 
 if __name__ == '__main__':

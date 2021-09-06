@@ -36,8 +36,9 @@ sc.update_k_data_daliy()
 #     try:
 #         file_name = os.path.join(cons.stock_history_path, s_code + ".csv")
 #         data = pd.read_csv(file_name)
-#         data.insert(1, '代码', s_code)
-#         data.insert(2, '名称', name)
+#         data['代码'] = s_code
+#         # data.insert(1, '代码', s_code)
+#         # data.insert(2, '名称', name)
 #         data.to_csv(os.path.join(cons.stock_history_path, s_code + ".csv"), encoding="utf-8", index=False)
 #         logger.info(str(s_code) + ':采集成功')
 #     except BaseException:
