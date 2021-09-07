@@ -54,10 +54,9 @@ def save_stock_basic():
     name	证券名称
     """
     result = tae.stock_zh_a_spot_em()
-    result.dropna(inplace=True)
+    result = result[result['最新价'].notna()]
     result = result[['代码', '名称']]
-    result.columns = ['code', 'name']
-    result.sort_values(by='code', inplace=True)
+    result.sort_values(by='代码', inplace=True)
     # 结果集输出到csv文件
     result.to_csv(cons.stock_basic_file, encoding="utf-8", index=False)
     logger.info('A股票基本资料采集成功.')
@@ -108,7 +107,7 @@ def update_k_data_daliy():
         logger.warning('当日交易未开始,不进行更新')
         return
     df = tae.stock_zh_a_spot_em()
-    df.dropna(inplace=True)
+    df = df[df['最新价'].notna()]
     df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
     df.insert(1, '日期', today.strftime('%Y-%m-%d'))
@@ -166,4 +165,4 @@ def save_forecast(date):
 
 
 if __name__ == '__main__':
-    save_history_k_data('600519', adjust='qfq')
+    save_stock_basic()

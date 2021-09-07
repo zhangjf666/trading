@@ -16,8 +16,8 @@ import trading.strategy.constant as scons
 def selectOversoldStock(publicDays=180, maxDrawdown=60):
     stocks = pd.DataFrame(columns=['日期', '代码', '名称', '最大回撤', '回撤最高日期', '回撤最低日期', '总市值', '流通市值'])
     # 读取所有股票列表
-    basic = pd.read_csv(ccons.stock_basic_file, dtype={'code': str})
-    for code in basic['code']:
+    basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
+    for code in basic['代码']:
         # 判断上市天数
         kdata = pd.read_csv(os.path.join(ccons.stock_history_path, code + '.csv'))
         kdata.index = pd.DatetimeIndex(kdata['日期'])

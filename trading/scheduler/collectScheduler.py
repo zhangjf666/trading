@@ -3,12 +3,12 @@ import sys,os
 sys.path.extend(['F:/python/envs/trading/Lib/site-packages'])
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import datetime
-# from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+# from apscheduler.schedulers.blocking import BlockingScheduler
 from trading.config.logger import logger
 import trading.collector.stock_collector as sc
 
-scheduler = BlockingScheduler()
+scheduler = BackgroundScheduler()
 
 
 def update_stock_basic():
@@ -30,9 +30,9 @@ if __name__ == '__main__':
     scheduler.add_job(update_stock_basic, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 添加更新北向资金任务
     nexttime = nexttime + datetime.timedelta(minutes=2)
-    scheduler.add_job(update_stock_basic, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    scheduler.add_job(update_n2s, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 添加更新股票历史数据任务
-    nexttime = nexttime + datetime.timedelta(minutes=5)
+    nexttime = nexttime + datetime.timedelta(minutes=2)
     scheduler.add_job(update_k_data, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     try:
         # 开始调度
