@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 """
 Date: 2021-01-14 22:00:56
-Desc: 超跌次新股搏反弹策略
+Desc: 超跌次新股搏反弹策略,选出上市小于180个交易日,回撤超过60%的次新股,按流通市值从小到大排列,博大幅反弹,卖出策略为连续5个交易日内涨幅超过20%或者4个交易日下跌超过10%
 """
 
 import os
@@ -11,6 +11,7 @@ import pandas as pd
 import trading.collector.constant as ccons
 import trading.strategy.calc as calc
 import trading.strategy.constant as scons
+from trading.config.logger import logger
 
 
 def selectOversoldStock(publicDays=180, maxDrawdown=60):
@@ -18,8 +19,12 @@ def selectOversoldStock(publicDays=180, maxDrawdown=60):
     # 读取所有股票列表
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
     for code in basic['代码']:
+        file_name = os.path.join(ccons.stock_history_path, code + ".csv")
+        exists = os.path.exists(file_name)
+        if not exists:
+            continue
         # 判断上市天数
-        kdata = pd.read_csv(os.path.join(ccons.stock_history_path, code + '.csv'))
+        kdata = pd.read_csv(file_name)
         kdata.index = pd.DatetimeIndex(kdata['日期'])
         startDate = kdata.index[0]
         endDate = kdata.index[-1]
@@ -41,6 +46,7 @@ def selectOversoldStock(publicDays=180, maxDrawdown=60):
     if not os.path.exists(path):
         os.mkdir(path)
     stocks.to_csv(os.path.join(path, 'stock' + scons.file_type_csv), mode='a', encoding="utf-8", index=False)
+    logger.info('超跌次新股搏反弹策略,执行完成')
 
 
 if __name__ == '__main__':

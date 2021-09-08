@@ -4,11 +4,11 @@ sys.path.extend(['F:/python/envs/trading/Lib/site-packages'])
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-# from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from trading.config.logger import logger
 import trading.collector.stock_collector as sc
 
-scheduler = BackgroundScheduler()
+scheduler = BlockingScheduler()
 
 
 def update_stock_basic():
