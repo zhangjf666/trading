@@ -19,7 +19,7 @@ ma_list = [5, 10, 20]
 ma_column = ['ma_5', 'ma_10', 'ma_20']
 
 
-def ma_higher(filterHigherDays = 3):
+def ma_higher(filterHigherDays=3):
     stocks = pd.DataFrame(columns=['日期', '代码', '名称', '总市值', '流通市值', '起始时间', '持续天数'])
     # 读取所有股票列表
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
@@ -66,7 +66,8 @@ def ma_higher(filterHigherDays = 3):
     path = os.path.join(scons.strategy_path, "ma_higher")
     if not os.path.exists(path):
         os.mkdir(path)
-    stocks.to_csv(os.path.join(path, 'stock' + scons.file_type_csv), mode='a', encoding="utf-8", index=False)
+    filename = os.path.join(path, 'stock' + scons.file_type_csv)
+    stocks.to_csv(filename, mode='a', encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
     logger.info('均线多头策略,执行完成')
 
 
