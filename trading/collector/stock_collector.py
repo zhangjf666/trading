@@ -153,6 +153,7 @@ def save_n2s():
     n2s = n2s.to_csv(os.path.join(cons.stock_n2s_path, 'n2s.csv'),
                      encoding="utf-8",
                      index=False)
+    logger.info('更新北向资金数据结束.')
 
 
 # 业绩预告

@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 from trading.config.logger import logger
 import trading.collector.stock_collector as sc
+import trading.strategy as strategy
 
 scheduler = BlockingScheduler()
 
@@ -23,6 +24,18 @@ def update_n2s():
     sc.save_n2s()
 
 
+def select_over_sold_strategy():
+    strategy.oversoldNewStock.selectOversoldStock()
+
+
+def sell_over_sold_strategy():
+    strategy.oversoldNewStock.sellOverStock()
+
+
+def select_ma_higher_strategy():
+    strategy.ma_higher.select_ma_higher()
+
+
 if __name__ == '__main__':
     now = datetime.datetime.now()
     # 添加获取所有股票代码任务
@@ -34,6 +47,15 @@ if __name__ == '__main__':
     # 添加更新股票历史数据任务
     nexttime = nexttime + datetime.timedelta(minutes=2)
     scheduler.add_job(update_k_data, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 超跌次新选股策略
+    nexttime = nexttime + datetime.timedelta(minutes=20)
+    scheduler.add_job(select_over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 超跌次新选股卖出策略
+    nexttime = nexttime + datetime.timedelta(minutes=10)
+    scheduler.add_job(sell_over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 均线多头选股策略
+    nexttime = nexttime + datetime.timedelta(minutes=5)
+    scheduler.add_job(select_ma_higher_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     try:
         # 开始调度
         scheduler.start()
