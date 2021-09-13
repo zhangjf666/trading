@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 from trading.config.logger import logger
 import trading.collector.stock_collector as sc
-import trading.strategy as strategy
+from trading.strategy import ma_higher, oversoldNewStock
 
 scheduler = BlockingScheduler()
 
@@ -25,15 +25,15 @@ def update_n2s():
 
 
 def select_over_sold_strategy():
-    strategy.oversoldNewStock.selectOversoldStock()
+    oversoldNewStock.selectOversoldStock()
 
 
 def sell_over_sold_strategy():
-    strategy.oversoldNewStock.sellOverStock()
+    oversoldNewStock.sellOverStock()
 
 
 def select_ma_higher_strategy():
-    strategy.ma_higher.select_ma_higher()
+    ma_higher.select_ma_higher()
 
 
 if __name__ == '__main__':
