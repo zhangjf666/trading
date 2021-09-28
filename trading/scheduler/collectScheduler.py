@@ -37,6 +37,7 @@ def select_ma_higher_strategy():
 
 
 if __name__ == '__main__':
+    # now = datetime.datetime(2021, 1, 1, 20, 0, 0)
     now = datetime.datetime.now()
     # 添加获取所有股票代码任务
     nexttime = now + datetime.timedelta(minutes=1)
@@ -58,8 +59,9 @@ if __name__ == '__main__':
     scheduler.add_job(select_ma_higher_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     try:
         # 开始调度
-        scheduler.start()
+        scheduler.print_jobs()
         logger.info('计划任务开始')
+        scheduler.start()
     except BaseException as e:
         scheduler.shutdown()
         logger.error('计划任务结束:' + e)

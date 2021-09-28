@@ -19,7 +19,7 @@ ma_list = [5, 10, 20]
 ma_column = ['ma_5', 'ma_10', 'ma_20']
 
 
-def select_ma_higher(filterHigherDays=20, marketValue=100):
+def select_ma_higher(filterLowerDays=5, filterHigherDays=15, marketValue=100):
     stocks = pd.DataFrame(columns=['日期', '代码', '名称', '总市值', '流通市值', '起始时间', '持续天数'])
     # 读取所有股票列表
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
@@ -62,7 +62,7 @@ def select_ma_higher(filterHigherDays=20, marketValue=100):
             stocks = stocks.append(stock, ignore_index=True)
     # 按持续天数排序
     stocks.sort_values(by=['持续天数', '流通市值'], ascending=[0, 0], inplace=True)
-    stocks = stocks[stocks['持续天数'] >= filterHigherDays]
+    stocks = stocks[(stocks['持续天数'] >= filterLowerDays) & (stocks['持续天数'] <= filterHigherDays)]
     stocks = stocks[stocks['流通市值'] >= marketValue * 100000000]
     path = os.path.join(scons.strategy_path, "ma_higher")
     if not os.path.exists(path):

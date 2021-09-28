@@ -66,6 +66,8 @@ def sellOverStock():
         stock.index = pd.DatetimeIndex(stock['日期'])
         stock.sort_index(inplace=True)
         stock = stock[stock.index > date]
+        if len(stock.index) == 0:
+            continue
         openPrice = stock.iloc[0]['开盘']
         stock['涨'] = stock['收盘'].shift(5)
         stock['跌'] = stock['收盘'].shift(4)
