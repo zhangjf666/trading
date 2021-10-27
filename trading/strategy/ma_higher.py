@@ -40,6 +40,7 @@ def select_ma_higher(filterLowerDays=5, filterHigherDays=15, marketValue=100):
         higherBegin = None
         df = df.diff(axis=1)
         column = ma_column[1:]
+        df = df[column]
         for index in df.index:
             row = df.loc[index]
             for j in range(len(column)):

@@ -113,16 +113,20 @@ def update_history_k_data(code, name='', start_date='19800101', end_date='212112
         data = pd.read_csv(file_name, dtype={'代码': str})
         data.index = pd.DatetimeIndex(data['日期'])
         data = data.sort_index()
-        # 去掉更新日期后的数据
-        time = datetime.datetime.strptime(start_date, '%Y%m%d')
-        data = data[data.index < time]
-        data.reset_index(inplace=True, drop=True)
+        # 分割更新日期前后的数据
+        start_time = datetime.datetime.strptime(start_date, '%Y%m%d')
+        front_data = data[data.index < start_time]
+        front_data.reset_index(inplace=True, drop=True)
+        end_time = datetime.datetime.strptime(end_date, '%Y%m%d')
+        after_data = data[data.index > end_time]
+        after_data.reset_index(inplace=True, drop=True)
         result = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
         result.insert(1, '代码', code)
         result.insert(2, '名称', name)
-        data = pd.concat([data, result])
+        alldata = pd.concat([front_data, result])
+        alldata = pd.concat([alldata, after_data])
         # 结果集输出到csv文件
-        data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
+        alldata.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
 
 
 # 每日更新股票数据

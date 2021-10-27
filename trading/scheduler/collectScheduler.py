@@ -49,7 +49,7 @@ if __name__ == '__main__':
     nexttime = nexttime + datetime.timedelta(minutes=2)
     scheduler.add_job(update_k_data, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 超跌次新选股策略
-    nexttime = nexttime + datetime.timedelta(minutes=20)
+    nexttime = nexttime + datetime.timedelta(minutes=10)
     scheduler.add_job(select_over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 超跌次新选股卖出策略
     nexttime = nexttime + datetime.timedelta(minutes=10)

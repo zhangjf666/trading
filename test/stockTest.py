@@ -18,14 +18,14 @@ from trading.config.logger import logger
 #     s_code = row['代码']
 #     name = row['名称']
 #     try:
-#         sc.update_history_k_data(s_code, name, start_date='20210930', end_date='20211012')
+#         sc.update_history_k_data(s_code, name, start_date='20211022', end_date='20211022')
 #         logger.info(str(s_code) + ':采集成功')
 #     except BaseException:
 #         logger.error(str(s_code) + ':采集失败,原因:' + traceback.format_exc())
 # logger.info('采集完成')
 
 # 更新某个股票
-# sc.update_history_k_data('000001', '平安银行', start_date='20210930', end_date='20211012')
+# sc.update_history_k_data('002539', '云图控股', start_date='20211022', end_date='20211022')
 
 # 每日更新所有股票K线(需要每天连续执行,不能间断)
 sc.update_k_data_daliy()
