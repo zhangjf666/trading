@@ -7,13 +7,13 @@ import os
 
 def createPath(path):
     if not os.path.exists(strategy_path):
-        os.mkdir(strategy_path)  # 如果不存在这个文件夹，就自动创建一个
+        os.makedirs(strategy_path)  # 如果不存在这个文件夹，就自动创建一个
 
 
 # csv文件类型
 file_type_csv = ".csv"
 # 文件保存路径
-save_root_path = "/python/data/trading/.data/"
+save_root_path = "/python/data/trading/data/"
 
 strategy_path = os.path.join(save_root_path, "strategy")
 createPath(strategy_path)
