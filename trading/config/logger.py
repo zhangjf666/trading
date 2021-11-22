@@ -5,9 +5,9 @@ import logging.config
 import logging.handlers
 
 cur_path = os.path.abspath('/python/data/trading/')  # log_path是存放日志的路径
-log_path = os.path.join(cur_path, '.logs')
+log_path = os.path.join(cur_path, 'logs')
 if not os.path.exists(log_path):
-    os.mkdir(log_path)  # 如果不存在这个logs文件夹，就自动创建一个
+    os.makedirs(log_path)  # 如果不存在这个logs文件夹，就自动创建一个
 
 LOGGING = {
     'version': 1,

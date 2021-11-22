@@ -28,6 +28,7 @@ def from_sina_code(code):
 def save_tradeday():
     df = ak.tool_trade_date_hist_sina()
     df.to_csv(cons.stock_tradedate_file, encoding="utf-8", index=False)
+    logger.info('交易日历更新成功.')
 
 
 # 获取某个日期的后一个交易日
@@ -63,7 +64,8 @@ def save_stock_basic():
 
 
 # 获取A股历史K线数据(全采集)
-def save_history_k_data(code,
+def save_history_k_data(code, 
+                        name,
                         start_date='19800101',
                         end_date='21211231',
                         adjust=""):
@@ -79,6 +81,8 @@ def save_history_k_data(code,
     # file_name = os.path.join(cons.stock_history_path, code + ".csv")
     # exists = os.path.exists(file_name)
     data = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
+    data.insert(1, '代码', code)
+    data.insert(2, '名称', name)
     # if (exists):
     #     data = pd.read_csv(file_name)
     #     data.index = pd.DatetimeIndex(data['日期'])

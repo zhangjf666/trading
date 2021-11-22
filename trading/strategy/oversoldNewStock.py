@@ -98,4 +98,5 @@ def sellOverStock():
 
 
 if __name__ == '__main__':
+    selectOversoldStock()
     sellOverStock()

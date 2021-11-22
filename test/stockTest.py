@@ -7,7 +7,7 @@ from trading.config.logger import logger
 
 
 # 获取A股所有股票代码
-# sc.save_stock_basic()
+sc.save_stock_basic()
 
 # 按时间更新股票历史数据
 # 加载所有股票代码
