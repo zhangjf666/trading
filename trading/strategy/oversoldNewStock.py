@@ -12,6 +12,7 @@ import trading.collector.constant as ccons
 import trading.strategy.calc as calc
 import trading.strategy.constant as scons
 from trading.config.logger import logger
+import trading.util.file_util as fileUtil
 
 
 def selectOversoldStock(publicDays=180, maxDrawdown=60):
@@ -43,8 +44,7 @@ def selectOversoldStock(publicDays=180, maxDrawdown=60):
     # 按流通市值排序
     stocks.sort_values(by='流通市值', inplace=True)
     path = os.path.join(scons.strategy_path, "over_sold_new_stock")
-    if not os.path.exists(path):
-        os.mkdir(path)
+    fileUtil.createPath(path)
     filename = os.path.join(path, 'stock' + scons.file_type_csv)
     stocks.to_csv(filename, mode='a', encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
     logger.info('超跌次新股搏反弹策略,执行完成')

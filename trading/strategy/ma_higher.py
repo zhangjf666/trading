@@ -13,6 +13,7 @@ import trading.collector.constant as ccons
 import trading.strategy.calc as calc
 import trading.strategy.constant as scons
 from trading.config.logger import logger
+import trading.util.file_util as fileUtil
 
 
 ma_list = [5, 10, 20]
@@ -66,8 +67,7 @@ def select_ma_higher(filterLowerDays=5, filterHigherDays=15, marketValue=100):
     stocks = stocks[(stocks['持续天数'] >= filterLowerDays) & (stocks['持续天数'] <= filterHigherDays)]
     stocks = stocks[stocks['流通市值'] >= marketValue * 100000000]
     path = os.path.join(scons.strategy_path, "ma_higher")
-    if not os.path.exists(path):
-        os.mkdir(path)
+    fileUtil.createPath(path)
     filename = os.path.join(path, 'stock' + scons.file_type_csv)
     stocks.to_csv(filename, mode='a', encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
     logger.info('均线多头策略,执行完成')

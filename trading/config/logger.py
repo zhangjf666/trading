@@ -3,11 +3,11 @@ import time
 import logging
 import logging.config
 import logging.handlers
+import trading.util.file_util as fileUtil
 
 cur_path = os.path.abspath('/python/data/trading/')  # log_path是存放日志的路径
 log_path = os.path.join(cur_path, 'logs')
-if not os.path.exists(log_path):
-    os.makedirs(log_path)  # 如果不存在这个logs文件夹，就自动创建一个
+fileUtil.createPath(log_path)
 
 LOGGING = {
     'version': 1,
