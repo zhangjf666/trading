@@ -68,7 +68,7 @@ def select_ma_higher(filterLowerDays=5, filterHigherDays=15, marketValue=100):
     stocks = stocks[stocks['流通市值'] >= marketValue * 100000000]
     path = os.path.join(scons.strategy_path, "ma_higher")
     fileUtil.createPath(path)
-    filename = os.path.join(path, 'stock.' + datetime.datetime.today().strftime('%Y%m%d') + scons.file_type_csv)
+    filename = os.path.join(path, 'stock' + scons.file_type_csv)
     stocks.to_csv(filename, mode='a', encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
     logger.info('均线多头策略,执行完成')
 
