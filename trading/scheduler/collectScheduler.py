@@ -12,26 +12,44 @@ scheduler = BlockingScheduler()
 
 
 def update_stock_basic():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     sc.save_stock_basic()
 
 
 def update_k_data():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     sc.update_k_data_daliy()
 
 
 def update_n2s():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     sc.save_n2s()
 
 
 def select_over_sold_strategy():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     oversoldNewStock.selectOversoldStock()
 
 
 def sell_over_sold_strategy():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     oversoldNewStock.sellOverStock()
 
 
 def select_ma_higher_strategy():
+    if not (sc.is_trade_date(datetime.datetime.today())):
+        logger.warning('非交易日,不进行更新.')
+        return
     ma_higher.select_ma_higher()
 
 

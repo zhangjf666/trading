@@ -36,7 +36,7 @@ LOGGING = {
         'debug': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(log_path, 'log.{}.log'.format(time.strftime('%Y-%m-%d'))),
+            'filename': os.path.join(log_path, 'debug.{}.log'.format(time.strftime('%Y-%m-%d'))),
             'when': 'midnight',  # 滚动时间
             'backupCount': 5,  # 备份数
             'interval': 1,
