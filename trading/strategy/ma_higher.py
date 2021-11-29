@@ -20,7 +20,7 @@ ma_list = [5, 10, 20]
 ma_column = ['ma_5', 'ma_10', 'ma_20']
 
 
-def select_ma_higher(filterLowerDays=5, filterHigherDays=15, marketValue=100):
+def select_ma_higher(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
     stocks = pd.DataFrame(columns=['日期', '代码', '名称', '总市值', '流通市值', '起始时间', '持续天数'])
     # 读取所有股票列表
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
