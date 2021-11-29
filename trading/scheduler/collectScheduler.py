@@ -12,42 +12,36 @@ scheduler = BlockingScheduler()
 
 
 def update_stock_basic():
-    if not (sc.is_trade_date(datetime.datetime.today())):
+    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
     sc.save_stock_basic()
 
 
 def update_k_data():
-    if not (sc.is_trade_date(datetime.datetime.today())):
+    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
     sc.update_k_data_daliy()
 
 
 def update_n2s():
-    if not (sc.is_trade_date(datetime.datetime.today())):
+    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
     sc.save_n2s()
 
 
-def select_over_sold_strategy():
-    if not (sc.is_trade_date(datetime.datetime.today())):
+def over_sold_strategy():
+    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
     oversoldNewStock.selectOversoldStock()
-
-
-def sell_over_sold_strategy():
-    if not (sc.is_trade_date(datetime.datetime.today())):
-        logger.warning('非交易日,不进行更新.')
-        return
     oversoldNewStock.sellOverStock()
 
 
 def select_ma_higher_strategy():
-    if not (sc.is_trade_date(datetime.datetime.today())):
+    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
     ma_higher.select_ma_higher()
@@ -67,12 +61,9 @@ if __name__ == '__main__':
     scheduler.add_job(update_k_data, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 超跌次新选股策略
     nexttime = nexttime + datetime.timedelta(minutes=10)
-    scheduler.add_job(select_over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
-    # 超跌次新选股卖出策略
-    nexttime = nexttime + datetime.timedelta(minutes=10)
-    scheduler.add_job(sell_over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    scheduler.add_job(over_sold_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 均线多头选股策略
-    nexttime = nexttime + datetime.timedelta(minutes=5)
+    nexttime = nexttime + datetime.timedelta(minutes=10)
     scheduler.add_job(select_ma_higher_strategy, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     try:
         # 开始调度
