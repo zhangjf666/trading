@@ -202,5 +202,16 @@ def save_forecast(date):
     df.to_csv(os.path.join(cons.stock_forecast_path, date + cons.file_type_csv), encoding="utf-8", index=False)
 
 
+# 更新概念板块列表
+def update_concept_board():
+    """
+    更新概念板块列表
+    """
+    df = ak.stock_board_concept_name_ths()
+    df.rename(columns={'代码': 'url'}, inplace=True)
+    df['代码'] = df['url'].map(lambda x: x.replace('http://q.10jqka.com.cn/gn/detail/code/', '')[0:-1])
+    df.to_csv(os.path.join(cons.concept_list_file), encoding="utf-8", index=False)
+
+
 if __name__ == '__main__':
     save_n2s()

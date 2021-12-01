@@ -60,3 +60,15 @@ fund_exchange_rank_file = os.path.join(fund_path, fund_exchange_rank_file_name)
 fund_stock_hold_path = os.path.join(fund_path, "stock_hold")
 # 如果文件夹不存在,先创建
 fileUtil.createPath(fund_stock_hold_path)
+
+board_path = os.path.join(stock_path, 'board')
+# 如果文件夹不存在,先创建
+fileUtil.createPath(board_path)
+
+concept_list_file_name = "concept_list.csv"
+
+concept_list_file = os.path.join(board_path, concept_list_file_name)
+
+industry_list_file_name = "industry_list.csv"
+
+industry_list_file = os.path.join(board_path, industry_list_file_name)
