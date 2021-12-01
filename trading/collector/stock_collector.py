@@ -8,9 +8,10 @@ import pandas as pd
 import os
 import akshare as ak
 import datetime
-
+import time
 import trading.collector.constant as cons
 import trading.api.eastmoney as tae
+import trading.api.ths as tat
 from trading.config.logger import logger
 
 
@@ -64,7 +65,7 @@ def save_stock_basic():
 
 
 # 获取A股历史K线数据(全采集)
-def save_history_k_data(code, 
+def save_history_k_data(code,
                         name,
                         start_date='19800101',
                         end_date='21211231',
@@ -208,10 +209,87 @@ def update_concept_board():
     更新概念板块列表
     """
     df = ak.stock_board_concept_name_ths()
-    df.rename(columns={'代码': 'url'}, inplace=True)
+    # df.drop_duplicates()
+    df.rename(columns={'代码': 'url', '概念名称': '名称'}, inplace=True)
     df['代码'] = df['url'].map(lambda x: x.replace('http://q.10jqka.com.cn/gn/detail/code/', '')[0:-1])
-    df.to_csv(os.path.join(cons.concept_list_file), encoding="utf-8", index=False)
+    df.to_csv(cons.concept_list_file, encoding="utf-8", index=False)
+    logger.info('更新概念板块列表结束')
+
+
+# 更新概念板块成分股
+def update_concept_stocks():
+    """
+    更新概念板块成分股
+    """
+    if not os.path.exists(cons.concept_list_file):
+        logger.info('需先更新概念板块列表')
+        return
+    concept_list = pd.read_csv(cons.concept_list_file, dtype={'代码': str})
+    if(os.path.exists(cons.concept_stocks_file)):
+        stocks = pd.read_csv(cons.concept_stocks_file)
+    else:
+        stocks = pd.DataFrame()
+    for index in concept_list.index:
+        row = concept_list.loc[index, :]
+        code = row['代码']
+        name = row['名称']
+        temp = tat.stock_board_concept_cons_ths(code)
+        temp.drop(['序号'], axis=1, inplace=True)
+        temp['概念代码'] = code
+        temp['概念名称'] = name
+        if stocks.empty:
+            stocks = temp
+        else:
+            stocks = stocks[~(stocks['概念代码'] == int(code))]
+            stocks = stocks.append(temp)
+        stocks.to_csv(cons.concept_stocks_file, encoding="utf-8", index=False)
+        logger.info(name + '更新成功')
+        time.sleep(40)
+    logger.info('更新概念板块成分股结束')
+
+
+# 更新行业板块列表
+def update_industry_board():
+    """
+    更新行业板块列表
+    """
+    df = tat.stock_board_industry_name_ths()
+    df.drop_duplicates()
+    df.to_csv(cons.industry_list_file, encoding="utf-8", index=False)
+    logger.info('更新行业板块列表结束')
+
+
+# 更新行业板块成分股
+def update_industry_stocks():
+    """
+    更新行业板块成分股
+    """
+    if not os.path.exists(cons.industry_list_file):
+        logger.info('需先更新行业板块列表')
+        return
+    industry_list = pd.read_csv(cons.industry_list_file, dtype={'代码': str})
+    if(os.path.exists(cons.industry_stocks_file)):
+        stocks = pd.read_csv(cons.industry_stocks_file)
+    else:
+        stocks = pd.DataFrame()
+    for index in industry_list.index:
+        row = industry_list.loc[index, :]
+        code = row['代码']
+        name = row['名称']
+        temp = ak.stock_board_cons_ths(code)
+        temp.drop(['序号'], axis=1, inplace=True)
+        temp['行业代码'] = code
+        temp['行业名称'] = name
+        if stocks.empty:
+            stocks = temp
+        else:
+            stocks = stocks[~(stocks['行业代码'] == int(code))]
+            stocks = stocks.append(temp)
+        stocks.to_csv(cons.industry_stocks_file, encoding="utf-8", index=False)
+        logger.info(name + '更新成功')
+        time.sleep(40)
+    logger.info('更新行业板块成分股结束')
 
 
 if __name__ == '__main__':
-    save_n2s()
+    update_concept_board()

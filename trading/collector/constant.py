@@ -61,14 +61,31 @@ fund_stock_hold_path = os.path.join(fund_path, "stock_hold")
 # 如果文件夹不存在,先创建
 fileUtil.createPath(fund_stock_hold_path)
 
+# 板块文件夹
 board_path = os.path.join(stock_path, 'board')
 # 如果文件夹不存在,先创建
 fileUtil.createPath(board_path)
-
+# 概念板块列表文件名
 concept_list_file_name = "concept_list.csv"
-
+# 概念板块列表文件
 concept_list_file = os.path.join(board_path, concept_list_file_name)
-
+# 概念板块成分股文件名
+concept_stocks_file_name = "concept_stock.csv"
+# 概念板块成分股文件
+concept_stocks_file = os.path.join(board_path, concept_stocks_file_name)
+# 概念板块指数文件名
+concept_index_file_name = "concept_index.csv"
+# 概念板块指数文件
+concept_index_file = os.path.join(board_path, concept_index_file_name)
+# 行业板块列表文件名
 industry_list_file_name = "industry_list.csv"
-
+# 行业板块列表文件
 industry_list_file = os.path.join(board_path, industry_list_file_name)
+# 行业板块成分股文件名
+industry_stocks_file_name = "industry_stock.csv"
+# 行业板块成分股文件
+industry_stocks_file = os.path.join(board_path, industry_stocks_file_name)
+# 行业板块指数文件名
+industry_index_file_name = "industry_index.csv"
+# 行业板块指数文件
+industry_index_file = os.path.join(board_path, industry_index_file_name)

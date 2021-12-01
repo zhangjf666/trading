@@ -69,7 +69,7 @@ def select_ma_higher(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
     path = os.path.join(scons.strategy_path, "ma_higher")
     fileUtil.createPath(path)
     filename = os.path.join(path, 'stock' + scons.file_type_csv)
-    stocks.to_csv(filename, mode='a', encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
+    stocks.to_csv(filename, encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
     logger.info('均线多头策略,执行完成')
 
 
