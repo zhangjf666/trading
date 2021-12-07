@@ -208,7 +208,7 @@ def update_concept_board():
     """
     更新概念板块列表
     """
-    df = ak.stock_board_concept_name_ths()
+    df = tat.stock_board_concept_name_ths()
     # df.drop_duplicates()
     df.rename(columns={'代码': 'url', '概念名称': '名称'}, inplace=True)
     df['代码'] = df['url'].map(lambda x: x.replace('http://q.10jqka.com.cn/gn/detail/code/', '')[0:-1])
@@ -244,8 +244,50 @@ def update_concept_stocks():
             stocks = stocks.append(temp)
         stocks.to_csv(cons.concept_stocks_file, encoding="utf-8", index=False)
         logger.info(name + '更新成功')
-        time.sleep(40)
+        time.sleep(10)
     logger.info('更新概念板块成分股结束')
+
+
+# 更新概念板块指数
+def update_concept_index(start_year: str = None, end_year: str = None):
+    """
+    更新概念板块指数
+    """
+    if not os.path.exists(cons.concept_list_file):
+        logger.info('需先更新概念板块列表')
+        return
+    if not start_year:
+        start_year = datetime.datetime.now().year
+    if not end_year:
+        end_year = datetime.datetime.now().year
+    concept_list = pd.read_csv(cons.concept_list_file, dtype={'代码': str})
+    for index in concept_list.index:
+        row = concept_list.loc[index, :]
+        code = row['代码']
+        name = row['名称']
+        temp = tat.stock_board_concept_index_ths(code, start_year, end_year)
+        temp['代码'] = code
+        temp['名称'] = name
+        # 数据整合进文件
+        filename = os.path.join(cons.concept_index_path, code + cons.file_type_csv)
+        if not os.path.exists(filename):
+            alldata = temp
+        else:
+            data = pd.read_csv(filename, dtype={'代码': str})
+            data.index = pd.DatetimeIndex(data['日期'])
+            data.sort_index()
+            start_time = datetime.date(int(start_year), 1, 1)
+            front_data = data[data.index < pd.Timestamp(start_time)]
+            front_data.reset_index(inplace=True, drop=True)
+            end_time = datetime.date(int(start_year), 12, 31)
+            after_data = data[data.index > pd.Timestamp(end_time)]
+            after_data.reset_index(inplace=True, drop=True)
+            alldata = pd.concat([front_data, temp])
+            alldata = pd.concat([alldata, after_data])
+        alldata.to_csv(filename, encoding="utf-8", index=False)
+        logger.info(name + '更新成功')
+        time.sleep(10)
+    logger.info('更新概念板块指数')
 
 
 # 更新行业板块列表
@@ -276,7 +318,7 @@ def update_industry_stocks():
         row = industry_list.loc[index, :]
         code = row['代码']
         name = row['名称']
-        temp = ak.stock_board_cons_ths(code)
+        temp = tat.stock_board_cons_ths(code)
         temp.drop(['序号'], axis=1, inplace=True)
         temp['行业代码'] = code
         temp['行业名称'] = name
@@ -287,9 +329,54 @@ def update_industry_stocks():
             stocks = stocks.append(temp)
         stocks.to_csv(cons.industry_stocks_file, encoding="utf-8", index=False)
         logger.info(name + '更新成功')
-        time.sleep(40)
+        time.sleep(10)
     logger.info('更新行业板块成分股结束')
+
+
+# 更新行业板块指数
+def update_industry_index(start_year: str = None, end_year: str = None):
+    """
+    更新行业板块指数
+    """
+    if not os.path.exists(cons.industry_list_file):
+        logger.info('需先更新行业板块列表')
+        return
+    if not start_year:
+        start_year = datetime.datetime.now().year
+    if not end_year:
+        end_year = datetime.datetime.now().year
+    industry_list = pd.read_csv(cons.industry_list_file, dtype={'代码': str})
+    for index in industry_list.index:
+        row = industry_list.loc[index, :]
+        code = row['代码']
+        name = row['名称']
+        temp = tat.stock_board_industry_index_ths(code, start_year, end_year)
+        temp['代码'] = code
+        temp['名称'] = name
+        # 数据整合进文件
+        filename = os.path.join(cons.industry_index_path, code + cons.file_type_csv)
+        if not os.path.exists(filename):
+            alldata = temp
+        else:
+            data = pd.read_csv(filename, dtype={'代码': str})
+            data.index = pd.DatetimeIndex(data['日期'])
+            data.sort_index()
+            start_time = datetime.date(int(start_year), 1, 1)
+            front_data = data[data.index < pd.Timestamp(start_time)]
+            front_data.reset_index(inplace=True, drop=True)
+            end_time = datetime.date(int(start_year), 12, 31)
+            after_data = data[data.index > pd.Timestamp(end_time)]
+            after_data.reset_index(inplace=True, drop=True)
+            alldata = pd.concat([front_data, temp])
+            alldata = pd.concat([alldata, after_data])
+        alldata.to_csv(filename, encoding="utf-8", index=False)
+        logger.info(name + '更新成功')
+        time.sleep(10)
+    logger.info('更新行业板块指数')
 
 
 if __name__ == '__main__':
     update_concept_board()
+    update_industry_board()
+    update_concept_stocks()
+    update_industry_stocks()

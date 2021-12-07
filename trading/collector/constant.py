@@ -73,10 +73,9 @@ concept_list_file = os.path.join(board_path, concept_list_file_name)
 concept_stocks_file_name = "concept_stock.csv"
 # 概念板块成分股文件
 concept_stocks_file = os.path.join(board_path, concept_stocks_file_name)
-# 概念板块指数文件名
-concept_index_file_name = "concept_index.csv"
-# 概念板块指数文件
-concept_index_file = os.path.join(board_path, concept_index_file_name)
+# 概念板块指数文件夹
+concept_index_path = os.path.join(board_path, "concept_index")
+fileUtil.createPath(concept_index_path)
 # 行业板块列表文件名
 industry_list_file_name = "industry_list.csv"
 # 行业板块列表文件
@@ -85,7 +84,6 @@ industry_list_file = os.path.join(board_path, industry_list_file_name)
 industry_stocks_file_name = "industry_stock.csv"
 # 行业板块成分股文件
 industry_stocks_file = os.path.join(board_path, industry_stocks_file_name)
-# 行业板块指数文件名
-industry_index_file_name = "industry_index.csv"
-# 行业板块指数文件
-industry_index_file = os.path.join(board_path, industry_index_file_name)
+# 行业板块指数文件夹
+industry_index_path = os.path.join(board_path, "industry_index")
+fileUtil.createPath(industry_index_path)
