@@ -255,10 +255,6 @@ def stock_board_industry_index_ths(symbol: str = None,
     :rtype: pandas.DataFrame
     """
     big_df = pd.DataFrame()
-    if not start_year:
-        start_year = datetime.datetime.now().year
-    if not end_year:
-        end_year = datetime.datetime.now().year
     for year in tqdm(range(int(start_year), int(end_year) + 1), leave=False):
         url = f'http://d.10jqka.com.cn/v4/line/bk_{symbol}/01/{year}.js'
         headers = {
@@ -272,16 +268,19 @@ def stock_board_industry_index_ths(symbol: str = None,
         try:
             demjson.decode(data_text[data_text.find('{'):-1])
         except:
+            _sleep()
             continue
         temp_df = demjson.decode(data_text[data_text.find('{'):-1])
         temp_df = pd.DataFrame(temp_df['data'].split(';'))
         temp_df = temp_df.iloc[:, 0].str.split(',', expand=True)
         big_df = big_df.append(temp_df, ignore_index=True)
         _sleep()
-    big_df = big_df.iloc[:, 0:7]
-    big_df.columns = [
-        '日期', '开盘价', '最高价', '最低价', '收盘价', '成交量', '成交额'
-    ]
+    columns = ['日期', '开盘价', '最高价', '最低价', '收盘价', '成交量', '成交额']
+    if(big_df.shape[1] >= 7):
+        big_df = big_df.iloc[:, 0:7]
+        big_df.columns = columns
+    else:
+        big_df = pd.DataFrame(columns=columns)
     big_df['日期'] = pd.to_datetime(big_df['日期']).dt.date
     big_df['开盘价'] = pd.to_numeric(big_df['开盘价'])
     big_df['最高价'] = pd.to_numeric(big_df['最高价'])
