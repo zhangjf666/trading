@@ -378,5 +378,3 @@ def update_industry_index(start_year: str = None, end_year: str = None):
 if __name__ == '__main__':
     update_concept_board()
     update_industry_board()
-    update_concept_stocks()
-    update_industry_stocks()
