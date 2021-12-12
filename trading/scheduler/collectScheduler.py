@@ -21,8 +21,10 @@ def update_stock_task():
     sc.update_k_data_daliy()
     # 北向资金
     sc.save_n2s()
+    # 可转债比价表
+    sc.update_convertible()
     # 均线多头选股策略
-    ma_higher.select_ma_higher()
+    ma_higher.select_stock_ma()
     # 超跌次新买入卖出策略
     oversoldNewStock.selectOversoldStock()
     oversoldNewStock.sellOverStock()
@@ -32,8 +34,16 @@ def update_board_task():
     if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
         logger.warning('非交易日,不进行更新.')
         return
+    # 板块指数相关
     sc.update_industry_board()
     sc.update_concept_board()
+    sc.update_industry_stocks()
+    sc.update_concept_stocks()
+    sc.update_all_industry_index()
+    sc.update_all_concept_index()
+    # 指数均线策略
+    ma_higher.select_board_index_ma('1')
+    ma_higher.select_board_index_ma('2')
 
 
 if __name__ == '__main__':

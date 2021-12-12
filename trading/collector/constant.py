@@ -87,3 +87,10 @@ industry_stocks_file = os.path.join(board_path, industry_stocks_file_name)
 # 行业板块指数文件夹
 industry_index_path = os.path.join(board_path, "industry_index")
 fileUtil.createPath(industry_index_path)
+# 债券文件夹
+bond_path = os.path.join(stock_path, 'bond')
+fileUtil.createPath(bond_path)
+# 可转债比价表文件名
+convertible_file_name = "convertible.csv"
+# 可装在比价表文件
+convertible_file = os.path.join(bond_path, convertible_file_name)

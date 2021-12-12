@@ -12,11 +12,17 @@ collect = Blueprint('collect', __name__)
 
 @route(collect, '/collect/all-stock')
 def all_stock_basic():
-    basic = pd.read_csv(cons.stock_basic_file, dtype={'代码': str})
-    return basic.to_dict(orient='records')
+    df = pd.read_csv(cons.stock_basic_file, dtype={'代码': str})
+    return df.to_dict(orient='records')
 
 
 @route(collect, '/collect/trade-day')
 def trade_day():
     df = pd.read_csv(cons.stock_tradedate_file)
     return df['trade_date'].tolist()
+
+
+@route(collect, '/collect/convertible')
+def convertible():
+    df = pd.read_csv(cons.convertible_file)
+    return df.to_dict(orient='records')

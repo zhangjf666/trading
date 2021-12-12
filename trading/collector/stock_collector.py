@@ -10,8 +10,8 @@ import akshare as ak
 import datetime
 import time
 import trading.collector.constant as cons
-import trading.api.eastmoney as tae
-import trading.api.ths as tat
+import trading.api.eastmoney as em
+import trading.api.ths as ths
 from trading.config.logger import logger
 
 
@@ -55,7 +55,7 @@ def save_stock_basic():
     code	证券代码
     name	证券名称
     """
-    result = tae.stock_zh_a_spot_em()
+    result = em.stock_zh_a_spot_em()
     result = result[result['最新价'].notna()]
     result = result[['代码', '名称']]
     result.sort_values(by='代码', inplace=True)
@@ -73,10 +73,10 @@ def save_history_k_data(code,
     """
     获取A股历史K线数据
     入参
-    code：股票代码，6位数字代码，此参数不可为空；
-    start_date：开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
-    end_date：结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
-    adjust：复权类型，默认不复权,qfq:前复权,hfq:后复权
+    code:股票代码，6位数字代码，此参数不可为空；
+    start_date:开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
+    end_date:结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
+    adjust:复权类型，默认不复权,qfq:前复权,hfq:后复权
     """
 
     # file_name = os.path.join(cons.stock_history_path, code + ".csv")
@@ -106,10 +106,10 @@ def update_history_k_data(code, name='', start_date='19800101', end_date='212112
     """
     获取A股历史K线数据
     入参
-    code：股票代码，6位数字代码，此参数不可为空；
-    start_date：开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
-    end_date：结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
-    adjust：复权类型，默认不复权,qfq:前复权,hfq:后复权
+    code:股票代码，6位数字代码，此参数不可为空；
+    start_date:开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
+    end_date:结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
+    adjust:复权类型，默认不复权,qfq:前复权,hfq:后复权
     """
 
     file_name = os.path.join(cons.stock_history_path, code + ".csv")
@@ -144,7 +144,7 @@ def update_k_data_daliy():
     if not (isTradeDay and isTradeTime):
         logger.warning('当日交易未开始,不进行更新')
         return
-    df = tae.stock_zh_a_spot_em()
+    df = em.stock_zh_a_spot_em()
     df = df[df['最新价'].notna()]
     df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
@@ -208,7 +208,7 @@ def update_concept_board():
     """
     更新概念板块列表
     """
-    df = tat.stock_board_concept_name_ths()
+    df = ths.stock_board_concept_name_ths()
     # df.drop_duplicates()
     df.rename(columns={'代码': 'url', '概念名称': '名称'}, inplace=True)
     df['代码'] = df['url'].map(lambda x: x.replace('http://q.10jqka.com.cn/gn/detail/code/', '')[0:-1])
@@ -233,7 +233,7 @@ def update_concept_stocks():
         row = concept_list.loc[index, :]
         code = row['代码']
         name = row['名称']
-        temp = tat.stock_board_concept_cons_ths(code)
+        temp = ths.stock_board_concept_cons_ths(code)
         temp.drop(['序号'], axis=1, inplace=True)
         temp['概念代码'] = code
         temp['概念名称'] = name
@@ -243,8 +243,7 @@ def update_concept_stocks():
             stocks = stocks[~(stocks['概念代码'] == int(code))]
             stocks = stocks.append(temp)
         stocks.to_csv(cons.concept_stocks_file, encoding="utf-8", index=False)
-        logger.info(name + '更新成功')
-        time.sleep(10)
+        logger.info('[' + code + ']' + name + ' 更新成功')
     logger.info('更新概念板块成分股结束')
 
 
@@ -253,11 +252,14 @@ def update_concept_index(code: str = None, name: str = None, start_year: str = N
     """
     更新概念板块指数
     """
+    # 将要上市新股没有指数
+    if code == '301531':
+        return
     if not start_year:
         start_year = datetime.datetime.now().year
     if not end_year:
         end_year = datetime.datetime.now().year
-    temp = tat.stock_board_concept_index_ths(code, start_year, end_year)
+    temp = ths.stock_board_concept_index_ths(code, start_year, end_year)
     temp['代码'] = code
     temp['名称'] = name
     # 数据整合进文件
@@ -271,13 +273,13 @@ def update_concept_index(code: str = None, name: str = None, start_year: str = N
         start_time = datetime.date(int(start_year), 1, 1)
         front_data = data[data.index < pd.Timestamp(start_time)]
         front_data.reset_index(inplace=True, drop=True)
-        end_time = datetime.date(int(start_year), 12, 31)
+        end_time = datetime.date(int(end_year), 12, 31)
         after_data = data[data.index > pd.Timestamp(end_time)]
         after_data.reset_index(inplace=True, drop=True)
         alldata = pd.concat([front_data, temp])
         alldata = pd.concat([alldata, after_data])
     alldata.to_csv(filename, encoding="utf-8", index=False)
-    logger.info(name + '更新成功')
+    logger.info('[' + code + ']' + name + ' 更新成功')
 
 
 # 更新所有概念板块指数
@@ -298,8 +300,7 @@ def update_all_concept_index(start_year: str = None, end_year: str = None):
         code = row['代码']
         name = row['名称']
         update_concept_index(code, name, start_year, end_year)
-        time.sleep(10)
-    logger.info('更新概念板块指数')
+    logger.info('更新概念板块指数结束')
 
 
 # 更新行业板块列表
@@ -307,7 +308,7 @@ def update_industry_board():
     """
     更新行业板块列表
     """
-    df = tat.stock_board_industry_name_ths()
+    df = ths.stock_board_industry_name_ths()
     df.drop_duplicates()
     df.to_csv(cons.industry_list_file, encoding="utf-8", index=False)
     logger.info('更新行业板块列表结束')
@@ -330,7 +331,7 @@ def update_industry_stocks():
         row = industry_list.loc[index, :]
         code = row['代码']
         name = row['名称']
-        temp = tat.stock_board_cons_ths(code)
+        temp = ths.stock_board_cons_ths(code)
         temp.drop(['序号'], axis=1, inplace=True)
         temp['行业代码'] = code
         temp['行业名称'] = name
@@ -340,8 +341,7 @@ def update_industry_stocks():
             stocks = stocks[~(stocks['行业代码'] == int(code))]
             stocks = stocks.append(temp)
         stocks.to_csv(cons.industry_stocks_file, encoding="utf-8", index=False)
-        logger.info(name + '更新成功')
-        time.sleep(10)
+        logger.info('[' + code + ']' + name + ' 更新成功')
     logger.info('更新行业板块成分股结束')
 
 
@@ -354,7 +354,7 @@ def update_industry_index(code: str = None, name: str = None, start_year: str = 
         start_year = datetime.datetime.now().year
     if not end_year:
         end_year = datetime.datetime.now().year
-    temp = tat.stock_board_industry_index_ths(code, start_year, end_year)
+    temp = ths.stock_board_industry_index_ths(code, start_year, end_year)
     temp['代码'] = code
     temp['名称'] = name
     # 数据整合进文件
@@ -368,13 +368,13 @@ def update_industry_index(code: str = None, name: str = None, start_year: str = 
         start_time = datetime.date(int(start_year), 1, 1)
         front_data = data[data.index < pd.Timestamp(start_time)]
         front_data.reset_index(inplace=True, drop=True)
-        end_time = datetime.date(int(start_year), 12, 31)
+        end_time = datetime.date(int(end_year), 12, 31)
         after_data = data[data.index > pd.Timestamp(end_time)]
         after_data.reset_index(inplace=True, drop=True)
         alldata = pd.concat([front_data, temp])
         alldata = pd.concat([alldata, after_data])
     alldata.to_csv(filename, encoding="utf-8", index=False)
-    logger.info(name + '更新成功')
+    logger.info('[' + code + ']' + name + ' 更新成功')
 
 
 # 更新所有行业板块指数
@@ -395,9 +395,21 @@ def update_all_industry_index(start_year: str = None, end_year: str = None):
         code = row['代码']
         name = row['名称']
         update_industry_index(code, name, start_year, end_year)
-        time.sleep(10)
-    logger.info('更新行业板块指数')
+    logger.info('更新行业板块指数结束')
+
+
+# 可转债比价表
+def update_convertible():
+    """
+    更新可转债比价表
+    """
+    df = em.bond_cov_comparison()
+    df = df[~(df['转债最新价'] == '-')]
+    df['双低值'] = df['转债最新价'] + df['转股溢价率'] * 100
+    df.sort_values(by='双低值', inplace=True)
+    df.to_csv(cons.convertible_file, encoding='utf-8', index=False)
+    logger.info('可转债比价表更新结束')
 
 
 if __name__ == '__main__':
-    update_all_concept_index('2000', '2020')
+    update_convertible()

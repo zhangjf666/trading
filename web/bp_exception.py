@@ -2,6 +2,8 @@ import json
 from flask import Blueprint, Response
 from api_response import APIResponse
 from api_exception import APIException
+from trading.config.logger import logger
+import traceback
 
 exception = Blueprint('exception', __name__)
 
@@ -23,7 +25,8 @@ def error_405(error):
 @exception.app_errorhandler(Exception)
 def error_500(error):
     """这个handler可以catch住所有的abort(500)和raise exeception."""
+    logger.error(traceback.format_exc())
     if isinstance(error, APIException):
         return Response(error.get_body(), mimetype='application/json')
-    res = APIResponse(msg='系统内部错误', code=500)
+    res = APIResponse(msg=str(error), code=500)
     return Response(json.dumps(res.body()), mimetype='application/json')

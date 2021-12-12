@@ -46,7 +46,7 @@ def _get_file_content_ths(file_name: str = "ase.min.js") -> str:
     return file_data
 
 
-def _sleep(secend: int = 3):
+def _sleep(secend: int = 1):
     time.sleep(secend)
 
 

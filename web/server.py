@@ -4,12 +4,14 @@ Desc: flask服务端
 """
 from flask import Flask
 from bp_collect import collect
+from bp_strategy import strategy
 from bp_exception import exception
 
 app = Flask('web')
 # 注册蓝图
 app.register_blueprint(exception)
 app.register_blueprint(collect)
+app.register_blueprint(strategy)
 
 
 if __name__ == '__main__':

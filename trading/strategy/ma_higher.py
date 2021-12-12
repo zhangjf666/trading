@@ -7,6 +7,7 @@ Desc: 均线多头策略,选出当前5日,10日,20日线为多头排列,并且�
 
 import os
 import datetime
+from bs4.element import ResultSet
 import pandas as pd
 
 import trading.collector.constant as ccons
@@ -20,7 +21,8 @@ ma_list = [5, 10, 20]
 ma_column = ['ma_5', 'ma_10', 'ma_20']
 
 
-def select_ma_higher(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
+# 个股均线趋势
+def select_stock_ma(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
     stocks = pd.DataFrame(columns=['日期', '代码', '名称', '总市值', '流通市值', '起始时间', '持续天数'])
     # 读取所有股票列表
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
@@ -69,11 +71,11 @@ def select_ma_higher(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
     path = os.path.join(scons.strategy_path, "ma_higher")
     fileUtil.createPath(path)
     filename = os.path.join(path, 'stock' + scons.file_type_csv)
-    stocks.to_csv(filename, encoding="utf-8", index=False, header=None if os.path.isfile(filename) else True)
-    logger.info('均线多头策略,执行完成')
+    stocks.to_csv(filename, encoding="utf-8", index=False)
+    logger.info('股票均线多头策略,执行完成')
 
 
-def sell_ma_higher():
+def sell_stock_ma():
     stockdata = pd.read_csv(os.path.join(scons.ma_higher_path, 'stock.csv'), dtype={'代码': str})
     data = stockdata[stockdata['买卖标志'] == 0]
     data.index = pd.DatetimeIndex(data['日期'])
@@ -82,5 +84,68 @@ def sell_ma_higher():
 
     sellStocks = pd.DataFrame(columns=['日期', '代码', '名称', '买入日期', '卖出日期', '收盘', '涨幅', '跌幅', '持有天数'])
 
+
+# 板块指数均线趋势
+def select_board_index_ma(board='1', filterLowerDays=1, filterHigherDays=65535):
+    """
+    :board '1'=行业板块均线趋势,'2'=概念板块均线趋势
+    """
+    results = pd.DataFrame(columns=['日期', '代码', '名称', '成交量', '成交额', '起始时间', '持续天数'])
+    # 获取所有板块指数
+    ilist = pd.read_csv(ccons.industry_list_file if board == '1' else ccons.concept_list_file, dtype={'代码': str})
+    for code in ilist['代码']:
+        # 指数文件不存在,跳过
+        filepath = os.path.join(ccons.industry_index_path if board == '1' else ccons.concept_index_path, code + ccons.file_type_csv)
+        if not os.path.exists(filepath):
+            continue
+        # 判断多头趋势
+        data = pd.read_csv(filepath, dtype={'代码': str})
+        # 不满20天的指数没有均线,跳过
+        if data.shape[0] <= 20:
+            continue
+        data.index = pd.DatetimeIndex(data['日期'])
+        calc.df_ma(data, field='收盘价', ma_list=ma_list)
+        higherDays = 0
+        data = data.sort_index(ascending=False)
+        df = data[ma_column]
+        # 均线相减判断是否多头
+        isHigher = True
+        higherBegin = None
+        df = df.diff(axis=1)
+        column = ma_column[1:]
+        df = df[column]
+        for index in df.index:
+            row = df.loc[index]
+            for j in range(len(column)):
+                if row[j] > 0:
+                    isHigher = False
+                    break
+            if isHigher:
+                higherDays = higherDays + 1
+                higherBegin = row.name.strftime('%Y-%m-%d')
+            else:
+                break
+        # 如果有多头趋势,加入保存列表
+        if higherDays > 0:
+            result = {
+                        '日期': datetime.datetime.today().strftime('%Y-%m-%d'),
+                        '代码': code, '名称': data.iloc[0]['名称'],
+                        '成交量': data.iloc[0]['成交量'], '成交额': data.iloc[0]['成交额'],
+                        '起始时间': higherBegin, '持续天数': higherDays
+                    }
+            results = results.append(result, ignore_index=True)
+    # 按持续天数排序
+    results.sort_values(by=['持续天数'], ascending=[0], inplace=True)
+    results = results[(results['持续天数'] >= filterLowerDays) & (results['持续天数'] <= filterHigherDays)]
+    path = os.path.join(scons.strategy_path, "ma_higher")
+    fileUtil.createPath(path)
+    prefix = 'industry' if board == '1' else 'concept'
+    filename = os.path.join(path, prefix + '_index' + scons.file_type_csv)
+    results.to_csv(filename, encoding="utf-8", index=False)
+    logger.info(prefix + '指数均线多头策略,执行完成')
+
+
 if __name__ == '__main__':
-    select_ma_higher()
+    select_stock_ma()
+    select_board_index_ma('1')
+    select_board_index_ma('2')
