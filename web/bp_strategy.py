@@ -6,7 +6,6 @@ import os
 import json
 from flask import Blueprint, request
 from pydantic import BaseModel
-from flask_pydantic import validate
 from matplotlib.pyplot import cla
 from api_route import route
 import pandas as pd
@@ -39,11 +38,9 @@ class MaRequest(BaseModel):
 
 
 @route(strategy, '/strategy/index-ma', methods=['post'])
-@validate()
 def index_ma(body: MaRequest):
     # board = request.get_json()['board']
     board = body.board
-    print('=====>' + board)
     df = pd.DataFrame()
     if board == '1':
         df = pd.read_csv(os.path.join(scons.ma_higher_path, 'industry_index.csv'), dtype={'代码': str})

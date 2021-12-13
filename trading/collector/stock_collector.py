@@ -407,6 +407,9 @@ def update_convertible():
     df = df[~(df['转债最新价'] == '-')]
     df['双低值'] = df['转债最新价'] + df['转股溢价率'] * 100
     df.sort_values(by='双低值', inplace=True)
+    df['双低值'] = df['双低值'].apply(lambda x: format(x, '.2f'))
+    df.insert(0, '日期', datetime.datetime.today().strftime('%Y-%m-%d'))
+    df.drop(columns=['序号'], inplace=True)
     df.to_csv(cons.convertible_file, encoding='utf-8', index=False)
     logger.info('可转债比价表更新结束')
 
