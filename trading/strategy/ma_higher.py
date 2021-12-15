@@ -146,6 +146,5 @@ def select_board_index_ma(board='1', filterLowerDays=1, filterHigherDays=65535):
 
 
 if __name__ == '__main__':
-    select_stock_ma()
     select_board_index_ma('1')
     select_board_index_ma('2')

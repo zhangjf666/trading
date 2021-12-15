@@ -252,14 +252,13 @@ def update_concept_index(code: str = None, name: str = None, start_year: str = N
     """
     更新概念板块指数
     """
-    # 将要上市新股没有指数
-    if code == '301531':
-        return
     if not start_year:
         start_year = datetime.datetime.now().year
     if not end_year:
         end_year = datetime.datetime.now().year
     temp = ths.stock_board_concept_index_ths(code, start_year, end_year)
+    if temp.empty:
+        return
     temp['代码'] = code
     temp['名称'] = name
     # 数据整合进文件
@@ -415,4 +414,4 @@ def update_convertible():
 
 
 if __name__ == '__main__':
-    update_convertible()
+    update_all_concept_index()

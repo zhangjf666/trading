@@ -230,12 +230,15 @@ def stock_board_concept_index_ths(symbol: str = None,
         'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36',
     }
-    r = requests.get(symbol_url, headers=headers)
-    soup = BeautifulSoup(r.text, 'lxml')
-    symbol_code = soup.find('div', attrs={
-        'class': 'board-hq'
-    }).find('span').text
-    big_df = stock_board_industry_index_ths(symbol_code, start_year, end_year)
+    try:
+        r = requests.get(symbol_url, headers=headers)
+        soup = BeautifulSoup(r.text, 'lxml')
+        symbol_code = soup.find('div', attrs={
+            'class': 'board-hq'
+        }).find('span').text
+        big_df = stock_board_industry_index_ths(symbol_code, start_year, end_year)
+    except:
+        big_df = pd.DataFrame()
     return big_df
 
 
