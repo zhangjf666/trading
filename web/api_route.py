@@ -2,12 +2,11 @@
 Date: 2021-11-29 22:00:56
 Desc: 路由装饰器
 """
-from traceback import print_exc
 from flask import jsonify
 from functools import wraps
 
 from api_response import APIResponse
-from flask_pydantic import validate
+from pydantic_validator import validate
 
 
 def route(bp, *args, **kwargs):

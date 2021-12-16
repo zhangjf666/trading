@@ -3,7 +3,6 @@ Date: 2021-11-29 22:00:56
 Desc: 策略路由
 """
 import os
-import json
 from flask import Blueprint, request
 from pydantic import BaseModel
 from matplotlib.pyplot import cla
@@ -35,11 +34,11 @@ def stock_ma():
 
 class MaRequest(BaseModel):
     board: str
+    age: int
 
 
 @route(strategy, '/strategy/index-ma', methods=['post'])
 def index_ma(body: MaRequest):
-    # board = request.get_json()['board']
     board = body.board
     df = pd.DataFrame()
     if board == '1':
