@@ -1,3 +1,8 @@
+# -*- coding:utf-8 -*-
+"""
+Date: 2021-11-29 22:00:56
+Desc: 统一返回结果
+"""
 class APIResponse():
     msg = 'ok'
     code = 0

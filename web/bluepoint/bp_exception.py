@@ -1,3 +1,8 @@
+# -*- coding:utf-8 -*-
+"""
+Date: 2021-11-29 22:00:56
+Desc: 统一异常处理路由
+"""
 import json
 from flask import Blueprint, Response
 from api_response import APIResponse

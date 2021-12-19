@@ -21,3 +21,18 @@ fileUtil.createPath(over_sold_new_stock_path)
 # 均线多头策略 文件夹
 ma_higher_path = os.path.join(strategy_path, 'ma_higher')
 fileUtil.createPath(ma_higher_path)
+
+# 股票均线多头文件名
+ma_higher_stock_file_name = "stock.csv"
+# 股票均线多头文件
+ma_higher_stock_file = os.path.join(ma_higher_path, ma_higher_stock_file_name)
+
+# 行业指数均线多头文件名
+ma_higher_industry_index_file_name = "industry_index.csv"
+# 行业指数均线多头文件
+ma_higher_industry_index_file = os.path.join(ma_higher_path, ma_higher_industry_index_file_name)
+
+# 行业指数均线多头文件名
+ma_higher_concept_index_file_name = "concept_index.csv"
+# 行业指数均线多头文件
+ma_higher_concept_index_file = os.path.join(ma_higher_path, ma_higher_concept_index_file_name)

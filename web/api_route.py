@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 """
 Date: 2021-11-29 22:00:56
 Desc: 路由装饰器
@@ -5,7 +6,7 @@ Desc: 路由装饰器
 from flask import jsonify
 from functools import wraps
 
-from api_response import APIResponse
+from web.api_response import APIResponse
 from pydantic_validator import validate
 
 

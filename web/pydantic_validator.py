@@ -1,7 +1,12 @@
+# -*- coding:utf-8 -*-
+"""
+Date: 2021-11-29 22:00:56
+Desc: 参数验证装饰器
+"""
 from functools import wraps
 from typing import Any, Callable, Iterable, List, Optional, Tuple, Type, Union
 
-from flask import Response, current_app, jsonify, make_response, request
+from flask import Response, current_app, make_response, request
 from pydantic import BaseModel, ValidationError
 from pydantic.tools import parse_obj_as
 

@@ -68,10 +68,7 @@ def select_stock_ma(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
     stocks.sort_values(by=['持续天数', '流通市值'], ascending=[0, 0], inplace=True)
     stocks = stocks[(stocks['持续天数'] >= filterLowerDays) & (stocks['持续天数'] <= filterHigherDays)]
     stocks = stocks[stocks['流通市值'] >= marketValue * 100000000]
-    path = os.path.join(scons.strategy_path, "ma_higher")
-    fileUtil.createPath(path)
-    filename = os.path.join(path, 'stock' + scons.file_type_csv)
-    stocks.to_csv(filename, encoding="utf-8", index=False)
+    stocks.to_csv(scons.ma_higher_stock_file, encoding="utf-8", index=False)
     logger.info('股票均线多头策略,执行完成')
 
 
@@ -137,10 +134,8 @@ def select_board_index_ma(board='1', filterLowerDays=1, filterHigherDays=65535):
     # 按持续天数排序
     results.sort_values(by=['持续天数'], ascending=[0], inplace=True)
     results = results[(results['持续天数'] >= filterLowerDays) & (results['持续天数'] <= filterHigherDays)]
-    path = os.path.join(scons.strategy_path, "ma_higher")
-    fileUtil.createPath(path)
-    prefix = 'industry' if board == '1' else 'concept'
-    filename = os.path.join(path, prefix + '_index' + scons.file_type_csv)
+    prefix = '行业' if board == '1' else '概念'
+    filename = scons.ma_higher_industry_index_file if board == '1' else scons.ma_higher_concept_index_file
     results.to_csv(filename, encoding="utf-8", index=False)
     logger.info(prefix + '指数均线多头策略,执行完成')
 

@@ -1,3 +1,8 @@
+# -*- coding:utf-8 -*-
+"""
+Date: 2021-11-29 22:00:56
+Desc: 异常定义
+"""
 from flask import json
 from typing import List
 
