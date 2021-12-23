@@ -7,7 +7,7 @@ from flask import jsonify
 from functools import wraps
 
 from web.api_response import APIResponse
-from pydantic_validator import validate
+from web.pydantic_validator import validate
 
 
 def route(bp, *args, **kwargs):

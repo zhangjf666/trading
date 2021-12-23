@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 """
 Date: 2021-11-29 22:00:56
-Desc: 参数验证装饰器
+Desc: 参数验证装饰器,来自flask-pydantic
 """
 from functools import wraps
 from typing import Any, Callable, Iterable, List, Optional, Tuple, Type, Union
@@ -17,7 +17,7 @@ from api_exception import (
 )
 
 from werkzeug.datastructures import ImmutableMultiDict
-from api_exception import APIException
+from web.api_exception import APIException
 
 try:
     from flask_restful import original_flask_make_response as make_response

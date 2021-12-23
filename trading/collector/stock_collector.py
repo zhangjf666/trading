@@ -209,9 +209,9 @@ def update_concept_board():
     更新概念板块列表
     """
     df = ths.stock_board_concept_name_ths()
-    # df.drop_duplicates()
     df.rename(columns={'代码': 'url', '概念名称': '名称'}, inplace=True)
     df['代码'] = df['url'].map(lambda x: x.replace('http://q.10jqka.com.cn/gn/detail/code/', '')[0:-1])
+    df.drop_duplicates(inplace=True)
     df.to_csv(cons.concept_list_file, encoding="utf-8", index=False)
     logger.info('更新概念板块列表结束')
 
@@ -414,4 +414,4 @@ def update_convertible():
 
 
 if __name__ == '__main__':
-    update_all_concept_index()
+    update_concept_board()
