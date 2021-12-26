@@ -14,6 +14,9 @@ from py_mini_racer import py_mini_racer
 from tqdm import tqdm
 import demjson
 
+# 设置重试次数
+requests.adapters.DEFAULT_RETRIES = 3
+
 
 def _get_js_path_ths(name: str = None, module_file: str = None) -> str:
     """

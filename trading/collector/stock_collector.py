@@ -81,7 +81,7 @@ def save_history_k_data(code,
 
     # file_name = os.path.join(cons.stock_history_path, code + ".csv")
     # exists = os.path.exists(file_name)
-    data = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
+    data = ak.stock_zh_a_hist(symbol=code, start_date=start_date, end_date=end_date, adjust=adjust)
     data.insert(1, '代码', code)
     data.insert(2, '名称', name)
     # if (exists):
@@ -125,7 +125,7 @@ def update_history_k_data(code, name='', start_date='19800101', end_date='212112
         end_time = datetime.datetime.strptime(end_date, '%Y%m%d')
         after_data = data[data.index > end_time]
         after_data.reset_index(inplace=True, drop=True)
-        result = ak.stock_zh_a_hist(code, start_date, end_date, adjust)
+        result = ak.stock_zh_a_hist(symbol=code, start_date=start_date, end_date=end_date, adjust=adjust)
         result.insert(1, '代码', code)
         result.insert(2, '名称', name)
         alldata = pd.concat([front_data, result])
