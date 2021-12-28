@@ -4,6 +4,7 @@ Date: 2021-11-29 22:00:56
 Desc: 采集路由
 """
 from flask import Blueprint
+from pydantic import BaseModel
 from api_route import route
 import pandas as pd
 import trading.collector.constant as cons
@@ -23,10 +24,20 @@ def trade_day():
     return df['trade_date'].tolist()
 
 
+class ConvertibleRequest(BaseModel):
+    miniDoubleValue: int = 0
+    maxDoubleValue: int = 1000000
+    miniBondPrice: int = 0
+    maxBondPrice: int = 100000
+
+
 @route(collect, '/convertible')
-def convertible():
-    df = pd.read_csv(cons.convertible_file)
-    return df.to_dict(orient='records')
+def convertible(query: ConvertibleRequest):
+    result = pd.read_csv(cons.convertible_file)
+    result = result[(result['双低值'] >= query.miniDoubleValue) & (result['双低值'] <= query.maxDoubleValue)]
+    result = result[(result['转债最新价'] >= query.miniBondPrice) & (result['转债最新价'] <= query.maxBondPrice)]
+    result.sort_values(by=['双低值'], ascending=[0], inplace=True)
+    return result.to_dict(orient='records')
 
 
 @route(collect, '/industry-list')

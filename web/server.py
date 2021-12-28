@@ -7,8 +7,10 @@ from flask import Flask
 from web.bluepoint.bp_collect import collect
 from web.bluepoint.bp_strategy import strategy
 from web.bluepoint.bp_exception import exception
+from flask_cors import CORS
 
 app = Flask('trading-web')
+CORS(app, resource=r'/*')
 
 # 注册蓝图
 app.register_blueprint(exception)
