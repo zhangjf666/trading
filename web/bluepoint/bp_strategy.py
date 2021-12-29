@@ -56,6 +56,9 @@ def stock_ma(query: StockMaRequest):
     result.sort_values(by=['持续天数', '流通市值'], ascending=[0, 0], inplace=True)
     result = result[(result['持续天数'] >= query.miniTrendDay) & (result['持续天数'] <= query.maxTrendDay)]
     result = result[(result['流通市值'] >= query.miniMarketValue * 100000000) & (result['流通市值'] <= query.maxMarketValue * 100000000)]
+    result['成交量'] = (result['成交量'].astype(float)/100000000).round(2)
+    result['成交额'] = (result['成交额'].astype(float)/100000000).round(2)
+    result.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
     return result.to_dict(orient='records')
 
 
@@ -71,9 +74,22 @@ def IndexMa(query: IndexMaRequest):
     df = pd.DataFrame()
     if boardType == '1':
         df = pd.read_csv(os.path.join(scons.ma_higher_path, 'industry_index.csv'), dtype={'代码': str})
+        df.insert(0, '指数类型', '行业指数')
     elif boardType == '2':
         df = pd.read_csv(os.path.join(scons.ma_higher_path, 'concept_index.csv'), dtype={'代码': str})
+        df.insert(0, '指数类型', '概念指数')
+    elif boardType == '3':
+        idf = pd.read_csv(os.path.join(scons.ma_higher_path, 'industry_index.csv'), dtype={'代码': str})
+        idf.insert(0, '指数类型', '行业指数')
+        df = idf
+        cdf = pd.read_csv(os.path.join(scons.ma_higher_path, 'concept_index.csv'), dtype={'代码': str})
+        cdf.insert(0, '指数类型', '概念指数')
+        df = df.append(cdf)
     else:
         raise APIException(400, '不支持的板块类型')
     df = df[(df['持续天数'] >= query.miniTrendDay) & (df['持续天数'] <= query.maxTrendDay)]
+    df.sort_values(by=['持续天数'], ascending=[0], inplace=True)
+    df['成交量'] = (df['成交量'].astype(float)/100000000).round(2)
+    df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
+    df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
     return df.to_dict(orient='records')
