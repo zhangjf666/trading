@@ -15,13 +15,13 @@ collect = Blueprint('collect', __name__, url_prefix='/collect')
 @route(collect, '/all-stock')
 def all_stock_basic():
     df = pd.read_csv(cons.stock_basic_file, dtype={'代码': str})
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(collect, '/trade-day')
 def trade_day():
     df = pd.read_csv(cons.stock_tradedate_file)
-    return df['trade_date'].tolist()
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 class ConvertibleRequest(BaseModel):
@@ -37,28 +37,28 @@ def convertible(query: ConvertibleRequest):
     result = result[(result['双低值'] >= query.miniDoubleValue) & (result['双低值'] <= query.maxDoubleValue)]
     result = result[(result['转债最新价'] >= query.miniBondPrice) & (result['转债最新价'] <= query.maxBondPrice)]
     result.sort_values(by=['双低值'], ascending=[0], inplace=True)
-    return result.to_dict(orient='records')
+    return result.to_dict(orient='records') if result.shape[0] > 0 else []
 
 
 @route(collect, '/industry-list')
 def industry_list():
     df = pd.read_csv(cons.industry_list_file)
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(collect, '/concept-list')
 def concept_list():
     df = pd.read_csv(cons.concept_list_file)
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(collect, '/industry-stock')
 def industry_stock():
     df = pd.read_csv(cons.industry_stocks_file)
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(collect, '/concept-stock')
 def concept_stock():
     df = pd.read_csv(cons.concept_stocks_file)
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []

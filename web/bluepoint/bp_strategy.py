@@ -18,13 +18,13 @@ strategy = Blueprint('strategy', __name__, url_prefix='/strategy')
 @route(strategy, '/select-oversold-stock')
 def select_oversold_stock():
     df = pd.read_csv(os.path.join(scons.over_sold_new_stock_path, 'stock.csv'), dtype={'代码': str})
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(strategy, '/sell-over-stock')
 def sell_over_stock():
     df = pd.read_csv(os.path.join(scons.over_sold_new_stock_path, 'sell_stock.csv'), dtype={'代码': str})
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 class StockMaRequest(BaseModel):
@@ -56,10 +56,10 @@ def stock_ma(query: StockMaRequest):
     result.sort_values(by=['持续天数', '流通市值'], ascending=[0, 0], inplace=True)
     result = result[(result['持续天数'] >= query.miniTrendDay) & (result['持续天数'] <= query.maxTrendDay)]
     result = result[(result['流通市值'] >= query.miniMarketValue * 100000000) & (result['流通市值'] <= query.maxMarketValue * 100000000)]
-    result['成交量'] = (result['成交量'].astype(float)/100000000).round(2)
-    result['成交额'] = (result['成交额'].astype(float)/100000000).round(2)
-    result.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
-    return result.to_dict(orient='records')
+    result['总市值'] = (result['总市值'].astype(float)/100000000).round(2)
+    result['流通市值'] = (result['流通市值'].astype(float)/100000000).round(2)
+    result.rename(columns={'总市值': '总市值(亿)', '流通市值': '流通市值(亿)'}, inplace=True)
+    return result.to_dict(orient='records') if result.shape[0] > 0 else []
 
 
 class IndexMaRequest(BaseModel):
@@ -92,4 +92,4 @@ def IndexMa(query: IndexMaRequest):
     df['成交量'] = (df['成交量'].astype(float)/100000000).round(2)
     df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
     df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
-    return df.to_dict(orient='records')
+    return df.to_dict(orient='records') if df.shape[0] > 0 else []

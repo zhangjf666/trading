@@ -13,8 +13,7 @@ class APIResponse():
             self.code = code
         if msg:
             self.msg = msg
-        if data:
-            self.data = data
+        self.data = data
 
     def body(self):
         body = {}
