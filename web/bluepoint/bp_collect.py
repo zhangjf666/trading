@@ -36,7 +36,7 @@ def convertible(query: ConvertibleRequest):
     result = pd.read_csv(cons.convertible_file)
     result = result[(result['双低值'] >= query.miniDoubleValue) & (result['双低值'] <= query.maxDoubleValue)]
     result = result[(result['转债最新价'] >= query.miniBondPrice) & (result['转债最新价'] <= query.maxBondPrice)]
-    result.sort_values(by=['双低值'], ascending=[0], inplace=True)
+    result.sort_values(by=['双低值'], ascending=[True], inplace=True)
     return result.to_dict(orient='records') if result.shape[0] > 0 else []
 
 

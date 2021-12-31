@@ -15,15 +15,30 @@ import trading.strategy.constant as scons
 strategy = Blueprint('strategy', __name__, url_prefix='/strategy')
 
 
+class OverSoldRequest(BaseModel):
+    beginDate: str
+    endDate: str
+
+
 @route(strategy, '/select-oversold-stock')
-def select_oversold_stock():
+def select_oversold_stock(query: OverSoldRequest):
     df = pd.read_csv(os.path.join(scons.over_sold_new_stock_path, 'stock.csv'), dtype={'代码': str})
+    df = df[(df['日期'] >= query.beginDate) & (df['日期'] <= query.endDate)]
+    df.sort_values(by='日期', ascending=False, inplace=True)
+    df['总市值'] = (df['总市值'].astype(float)/100000000).round(2)
+    df['流通市值'] = (df['流通市值'].astype(float)/100000000).round(2)
+    df.rename(columns={'总市值': '总市值(亿)', '流通市值': '流通市值(亿)'}, inplace=True)
     return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
 @route(strategy, '/sell-over-stock')
-def sell_over_stock():
+def sell_over_stock(query: OverSoldRequest):
     df = pd.read_csv(os.path.join(scons.over_sold_new_stock_path, 'sell_stock.csv'), dtype={'代码': str})
+    df = df[(df['日期'] >= query.beginDate) & (df['日期'] <= query.endDate)]
+    df.sort_values(by='日期', ascending=False, inplace=True)
+    df['涨幅'] = (df['涨幅'].astype(float) * 100).round(2)
+    df['跌幅'] = (df['跌幅'].astype(float) * 100).round(2)
+    df.rename(columns={'涨幅': '涨幅(%)', '跌幅': '跌幅(%)'}, inplace=True)
     return df.to_dict(orient='records') if df.shape[0] > 0 else []
 
 
@@ -53,7 +68,7 @@ def stock_ma(query: StockMaRequest):
     if len(result) == 0:
         result = df
     # 进行市值和持续天数排序
-    result.sort_values(by=['持续天数', '流通市值'], ascending=[0, 0], inplace=True)
+    result.sort_values(by=['持续天数', '流通市值'], ascending=[False, False], inplace=True)
     result = result[(result['持续天数'] >= query.miniTrendDay) & (result['持续天数'] <= query.maxTrendDay)]
     result = result[(result['流通市值'] >= query.miniMarketValue * 100000000) & (result['流通市值'] <= query.maxMarketValue * 100000000)]
     result['总市值'] = (result['总市值'].astype(float)/100000000).round(2)
@@ -88,7 +103,7 @@ def IndexMa(query: IndexMaRequest):
     else:
         raise APIException(400, '不支持的板块类型')
     df = df[(df['持续天数'] >= query.miniTrendDay) & (df['持续天数'] <= query.maxTrendDay)]
-    df.sort_values(by=['持续天数'], ascending=[0], inplace=True)
+    df.sort_values(by=['持续天数'], ascending=[False], inplace=True)
     df['成交量'] = (df['成交量'].astype(float)/100000000).round(2)
     df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
     df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)

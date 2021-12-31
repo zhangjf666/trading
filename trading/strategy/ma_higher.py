@@ -7,14 +7,12 @@ Desc: 均线多头策略,选出当前5日,10日,20日线为多头排列,并且�
 
 import os
 import datetime
-from bs4.element import ResultSet
 import pandas as pd
 
 import trading.collector.constant as ccons
 import trading.strategy.calc as calc
 import trading.strategy.constant as scons
 from trading.config.logger import logger
-import trading.util.file_util as fileUtil
 
 
 ma_list = [5, 10, 20]
