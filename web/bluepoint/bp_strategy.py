@@ -3,6 +3,7 @@
 Date: 2021-11-29 22:00:56
 Desc: 策略路由
 """
+from datetime import date
 import os
 from flask import Blueprint
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from web.api_route import route
 import pandas as pd
 import trading.collector.constant as ccons
 import trading.strategy.constant as scons
+import trading.strategy.n2s as tsn
+import json
 
 strategy = Blueprint('strategy', __name__, url_prefix='/strategy')
 
@@ -108,3 +111,28 @@ def IndexMa(query: IndexMaRequest):
     df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
     df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
     return df.to_dict(orient='records') if df.shape[0] > 0 else []
+
+
+class N2sSignRequest(BaseModel):
+    multiple: float = 2
+    period: int = 252
+
+
+@route(strategy, '/n2s-sign')
+def N2sSign(query: N2sSignRequest):
+    df = tsn.show_n2s_sign(multiple=query.multiple, period=query.period)
+    return json.loads(df.to_json(orient='records'))
+
+
+class N2sSignTestRequest(BaseModel):
+    code: str
+    startDate: str
+    endDate: str
+    multiple: float = 2
+    period: int = 252
+
+
+@route(strategy, '/n2s-sign-test-data')
+def N2sSignTestData(query: N2sSignTestRequest):
+    df = tsn.get_n2s_strategy_data(code=query.code, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
+    return json.loads(df.to_json(orient='records'))

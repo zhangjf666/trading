@@ -73,7 +73,7 @@ def get_n2s_data(start_date='2017-01-01',
 
 
 # 北向资金买入卖出点位图
-def show_n2s_sign(start_date='2017-01-01',
+def show_n2s_sign(start_date='2018-01-01',
                   end_date=None,
                   multiple=2,
                   period=252):
@@ -87,14 +87,15 @@ def show_n2s_sign(start_date='2017-01-01',
     df.loc[df['当日成交净买额'] < df['down'], 'operation'] = 0
     df.loc[df['operation'] == 1, 'buy'] = df['当日成交净买额']
     df.loc[df['operation'] == 0, 'sell'] = df['当日成交净买额']
+    return df
     # 画图
-    plt.plot(df.index, df['up'], color="green", label="up_line")
-    plt.plot(df.index, df['down'], color="black", label="down_line")
-    plt.plot(df.index, df['当日成交净买额'], color="red", label="net_buy")
-    plt.plot(df.index, df['buy'], 'go')
-    plt.plot(df.index, df['sell'], 'bo')
-    plt.legend()
-    plt.show()
+    # plt.plot(df.index, df['up'], color="green", label="up_line")
+    # plt.plot(df.index, df['down'], color="black", label="down_line")
+    # plt.plot(df.index, df['当日成交净买额'], color="red", label="net_buy")
+    # plt.plot(df.index, df['buy'], 'go')
+    # plt.plot(df.index, df['sell'], 'bo')
+    # plt.legend()
+    # plt.show()
 
 
 # 北向资金回测产品策略数据
