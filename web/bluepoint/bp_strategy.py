@@ -126,6 +126,7 @@ def N2sSign(query: N2sSignRequest):
 
 class N2sSignTestRequest(BaseModel):
     code: str
+    codeType: str = 0
     startDate: str
     endDate: str
     multiple: float = 2
@@ -134,5 +135,6 @@ class N2sSignTestRequest(BaseModel):
 
 @route(strategy, '/n2s-sign-test-data')
 def N2sSignTestData(query: N2sSignTestRequest):
-    df = tsn.get_n2s_strategy_data(code=query.code, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
-    return json.loads(df.to_json(orient='records'))
+    result = tsn.get_n2s_strategy_detail(code=query.code, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
+    print(type(result))
+    return result

@@ -12,6 +12,7 @@ import time
 import trading.collector.constant as cons
 import trading.api.eastmoney as em
 import trading.api.ths as ths
+import trading.api.sina as sina
 from trading.config.logger import logger
 
 
@@ -413,5 +414,16 @@ def update_convertible():
     logger.info('可转债比价表更新结束')
 
 
+# 保存指数列表
+def update_index():
+    """
+    更新指数列表
+    """
+    df = sina.stock_zh_index_spot()
+    df = df[['代码', '名称']]
+    df.to_csv(cons.index_list_file, encoding='utf-8', index=False)
+    logger.info('指数列表更新结束')
+
+
 if __name__ == '__main__':
-    update_concept_board()
+    update_index()

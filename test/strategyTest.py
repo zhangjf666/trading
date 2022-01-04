@@ -15,11 +15,11 @@ plt.rcParams['font.sans-serif'] = ['SimHei']  # 黑体
 plt.rcParams['axes.unicode_minus'] = False
 
 # 北向资金买入卖出指数
-tsn.show_n2s_sign(start_date='2020-01-01')
+# tsn.show_n2s_sign(start_date='2020-01-01')
 
 start_date = '2019-01-01'
 end_date = '2019-12-31'
-code = 'sh000300'
+code = '600519'
 # 北向资金回测指数数据图表
 # n2s = tsn.get_n2s_strategy_data(code, start_date, end_date)
 # fig, ax1 = plt.subplots()
@@ -33,5 +33,5 @@ code = 'sh000300'
 # ax2.legend()
 # plt.show()
 # 北向资金回测指数总计
-# n2s = tsn.get_n2s_strategy_summary(code, start_date, end_date)
-# print(n2s)
+n2s = tsn.get_n2s_strategy_detail(code, start_date, end_date)
+print(n2s)

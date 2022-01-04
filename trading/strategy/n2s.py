@@ -3,6 +3,7 @@
 Date: 2021-01-14 22:00:56
 Desc: 北向资金分析
 """
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -120,13 +121,13 @@ def get_n2s_strategy_data(code,
     n2s['point'].fillna(method='ffill', inplace=True)
     n2s['point'].fillna(0, inplace=True)
     # 计算净值
-    n2s['der'] = n2s['close'] / n2s['close'].shift(1) - 1
+    n2s['der'] = n2s['收盘'] / n2s['收盘'].shift(1) - 1
     n2s.loc[n2s.index[0], 'der'] = 0
     n2s.loc[n2s.index[0], 's_der'] = 0
     n2s.loc[n2s['point'] > n2s['point'].shift(1),
-            's_der'] = n2s['close'] / n2s['open'] - 1
+            's_der'] = n2s['收盘'] / n2s['开盘'] - 1
     n2s.loc[n2s['point'] < n2s['point'].shift(1),
-            's_der'] = n2s['open'] / n2s['close'].shift(1) - 1
+            's_der'] = n2s['开盘'] / n2s['收盘'].shift(1) - 1
     n2s.loc[n2s['point'] == n2s['point'].shift(1),
             's_der'] = n2s['der'] * n2s['point']
     n2s['s_net'] = [round(x, 4) for x in (n2s['s_der'] + 1.0).cumprod()]
@@ -147,7 +148,7 @@ def get_n2s_strategy_data(code,
 3.北向开始时间2016-12-05日, 252个交易日大约一年,最早能开始回测的时间大概在2018-01-01
 """
 # 北向资金回测收益率
-def get_n2s_strategy_summary(code,
+def get_n2s_strategy_detail(code,
                              start_date='2017-01-01',
                              end_date=None,
                              multiple=2,
@@ -177,20 +178,24 @@ def get_n2s_strategy_summary(code,
     n2s['per_close'] = n2s['net'] / n2s['max_close']
     min_point_total = n2s.sort_values(
         by=['per_close']).iloc[[0], n2s.columns.get_loc('per_close')]
+    result['min_point'] = min_point_total.index.format()[0]
     max_point_total = n2s[n2s.index <= min_point_total.index[0]].sort_values(
         by=['net'], ascending=False).iloc[[0], n2s.columns.get_loc('net')]
-    result['max_drawdown'] = np.round((1 - min_point_total.values) * 100, 2)
+    result['max_point'] = max_point_total.index.format()[0]
+    result['max_drawdown'] = round((1 - min_point_total.values[0]) * 100, 2)
     n2s['s_max_net'] = n2s['s_net'].expanding().max()
     n2s['s_per_net'] = n2s['s_net'] / n2s['s_max_net']
     s_min_point_total = n2s.sort_values(
         by=['s_per_net']).iloc[[0], n2s.columns.get_loc('s_per_net')]
+    result['s_min_point'] = s_min_point_total.index.format()[0]
     s_max_point_total = n2s[
         n2s.index <= s_min_point_total.index[0]].sort_values(
             by=['s_net'], ascending=False).iloc[[0],
                                                 n2s.columns.get_loc('s_net')]
-    result['s_max_drawdown'] = np.round((1 - s_min_point_total.values) * 100,
-                                        2)
-    return pd.DataFrame(result)
+    result['s_max_point'] = s_max_point_total.index.format()[0]
+    result['s_max_drawdown'] = round((1 - s_min_point_total.values[0]) * 100, 2)
+    data = {'summary': result, 'detail': json.loads(n2s.to_json(orient='records'))}
+    return data
 
 
 if __name__ == '__main__':

@@ -18,6 +18,10 @@ import demjson
 requests.adapters.DEFAULT_RETRIES = 3
 
 
+def _sleep(secend: int = 1):
+    time.sleep(secend)
+
+
 def _get_js_path_ths(name: str = None, module_file: str = None) -> str:
     """
     获取 JS 文件的路径(从模块所在目录查找)
@@ -47,10 +51,6 @@ def _get_file_content_ths(file_name: str = "ase.min.js") -> str:
     with open(setting_file_path) as f:
         file_data = f.read()
     return file_data
-
-
-def _sleep(secend: int = 1):
-    time.sleep(secend)
 
 
 def stock_board_concept_name_ths() -> pd.DataFrame:

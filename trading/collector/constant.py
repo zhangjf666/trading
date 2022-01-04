@@ -94,3 +94,18 @@ fileUtil.createPath(bond_path)
 convertible_file_name = "convertible.csv"
 # 可装在比价表文件
 convertible_file = os.path.join(bond_path, convertible_file_name)
+# 指数文件夹
+index_path = os.path.join(stock_path, 'index')
+# 如果文件夹不存在,先创建
+fileUtil.createPath(index_path)
+# 指数列表文件名
+index_list_file_name = "index_list.csv"
+# 指数列表文件
+index_list_file = os.path.join(index_path, index_list_file_name)
+# 指数分股文件名
+index_stocks_file_name = "index_stock.csv"
+# 指数成分股文件
+index_stocks_file = os.path.join(index_path, index_stocks_file_name)
+# 概念板块指数文件夹
+index_history_path = os.path.join(index_path, "index_history")
+fileUtil.createPath(index_history_path)
