@@ -19,7 +19,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 start_date = '2019-01-01'
 end_date = '2019-12-31'
-code = '600519'
+code = '000300'
 # 北向资金回测指数数据图表
 # n2s = tsn.get_n2s_strategy_data(code, start_date, end_date)
 # fig, ax1 = plt.subplots()
@@ -33,5 +33,5 @@ code = '600519'
 # ax2.legend()
 # plt.show()
 # 北向资金回测指数总计
-n2s = tsn.get_n2s_strategy_detail(code, start_date, end_date)
+n2s = tsn.get_n2s_strategy_detail(code=code, code_type=1, start_date=start_date, end_date=end_date)
 print(n2s)

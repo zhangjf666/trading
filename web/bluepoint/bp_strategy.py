@@ -133,8 +133,8 @@ class N2sSignTestRequest(BaseModel):
     period: int = 252
 
 
-@route(strategy, '/n2s-sign-test-data')
+@route(strategy, '/n2s-sign-test')
 def N2sSignTestData(query: N2sSignTestRequest):
-    result = tsn.get_n2s_strategy_detail(code=query.code, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
-    print(type(result))
+    print(query)
+    result = tsn.get_n2s_strategy_detail(code=query.code, code_type=query.codeType, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
     return result

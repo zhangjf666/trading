@@ -101,6 +101,7 @@ def show_n2s_sign(start_date='2018-01-01',
 
 # 北向资金回测产品策略数据
 def get_n2s_strategy_data(code,
+                            code_type=0,
                           start_date='2017-01-01',
                           end_date=None,
                           multiple=2,
@@ -109,8 +110,11 @@ def get_n2s_strategy_data(code,
         end_date = datetime.datetime.today().strftime("%Y-%m-%d")
     n2s = get_n2s_data(start_date, end_date, multiple, period)
     # 合并指数数据
-    df = pd.read_csv(os.path.join(cons.stock_history_path, code + '.csv'),
-                     index_col=0)
+    if code_type == '0':
+        filePath = os.path.join(cons.stock_history_path, code + '.csv')
+    elif code_type == '1':
+        filePath = os.path.join(cons.index_history_path, code + '.csv')
+    df = pd.read_csv(filePath, index_col=0)
     df.index = pd.DatetimeIndex(df.index)
     df = df[start_date:end_date]
     n2s = pd.merge(n2s, df, how='outer', left_index=True, right_index=True)
@@ -133,6 +137,9 @@ def get_n2s_strategy_data(code,
     n2s['s_net'] = [round(x, 4) for x in (n2s['s_der'] + 1.0).cumprod()]
     n2s['net'] = [round(x, 4) for x in (n2s['der'] + 1.0).cumprod()]
     return n2s.loc[n2s.index, [
+        '日期',
+        '代码',
+        '名称',
         'operation',
         'point',
         'der',
@@ -147,18 +154,23 @@ def get_n2s_strategy_data(code,
 2.当日北向资金净买入 < 过去252个交易日的北向资金净买入均值 - 2倍标准差,则第二个交易日清仓卖出沪深300
 3.北向开始时间2016-12-05日, 252个交易日大约一年,最早能开始回测的时间大概在2018-01-01
 """
+
+
 # 北向资金回测收益率
 def get_n2s_strategy_detail(code,
-                             start_date='2017-01-01',
-                             end_date=None,
-                             multiple=2,
-                             period=252,
-                             annual_trading_day=250):
-    n2s = get_n2s_strategy_data(code, start_date, end_date, multiple, period)
-    result = {'code': code}
+                            code_type='0',
+                            start_date='2017-01-01',
+                            end_date=None,
+                            multiple=2,
+                            period=252,
+                            annual_trading_day=250):
+    if code_type != '0' and code_type != '1':
+        raise Exception('代码类型错误')
+    n2s = get_n2s_strategy_data(code, code_type, start_date, end_date, multiple, period)
+    result = {'code': code, 'name': n2s['名称'].values[0]}
     # 计算收益率
-    result['er'] = (n2s.iloc[-1]['net'] - 1) * 100
-    result['s_er'] = (n2s.iloc[-1]['s_net'] - 1) * 100
+    result['er'] = round((n2s.iloc[-1]['net'] - 1) * 100, 2)
+    result['s_er'] = round((n2s.iloc[-1]['s_net'] - 1) * 100, 2)
     # 计算年收益率
     total_trading_day = len(n2s.index)
     final_net_worth = n2s.iloc[-1]['net']
@@ -193,8 +205,12 @@ def get_n2s_strategy_detail(code,
             by=['s_net'], ascending=False).iloc[[0],
                                                 n2s.columns.get_loc('s_net')]
     result['s_max_point'] = s_max_point_total.index.format()[0]
-    result['s_max_drawdown'] = round((1 - s_min_point_total.values[0]) * 100, 2)
-    data = {'summary': result, 'detail': json.loads(n2s.to_json(orient='records'))}
+    result['s_max_drawdown'] = round((1 - s_min_point_total.values[0]) * 100,
+                                     2)
+    data = {
+        'summary': result,
+        'detail': json.loads(n2s.to_json(orient='records'))
+    }
     return data
 
 

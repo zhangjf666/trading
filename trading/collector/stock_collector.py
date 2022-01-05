@@ -4,16 +4,17 @@ Date: 2021-01-14 22:00:56
 Desc: 股票数据获取
 """
 
+import traceback
 import pandas as pd
 import os
 import akshare as ak
 import datetime
-import time
 import trading.collector.constant as cons
 import trading.api.eastmoney as em
 import trading.api.ths as ths
 import trading.api.sina as sina
 from trading.config.logger import logger
+import trading.util.common_util as util
 
 
 def to_sina_code(code):
@@ -33,13 +34,13 @@ def save_tradeday():
     logger.info('交易日历更新成功.')
 
 
-# 获取某个日期的后一个交易日
-def next_trade_date(date):
+# 获取某个日期的后一个交易日, offset 偏移量,正值向后,负值向前
+def next_trade_date(date, offset: int = 1):
     tf = pd.read_csv(cons.stock_tradedate_file)
     tf['trade_date'] = pd.to_datetime(tf['trade_date'])
     tf.sort_values('trade_date')
-    tf = tf[tf['trade_date'] > date]
-    return pd.Timestamp(tf['trade_date'].values[0]).to_pydatetime()
+    tf = tf[tf['trade_date'] >= date] if offset >= 0 else tf[tf['trade_date'] < date]
+    return pd.Timestamp(tf['trade_date'].values[offset]).to_pydatetime().strftime('%Y-%m-%d')
 
 
 # 检查某个日期是否是交易日
@@ -139,12 +140,11 @@ def update_history_k_data(code, name='', start_date='19800101', end_date='212112
 def update_k_data_daliy():
     # 判断是否是交易日并且是开盘之后,开盘之前获取的是昨日的数据,会有问题
     today = datetime.datetime.today()
-    todayStr = today.strftime('%Y-%m-%d')
-    isTradeDay = is_trade_date(todayStr)
+    dateStr = today.strftime('%Y-%m-%d')
+    isTradeDay = is_trade_date(dateStr)
     isTradeTime = int(today.strftime('%H%M%S')) - int(datetime.time(9, 30, 0).strftime('%H%M%S')) > 0
-    if not (isTradeDay and isTradeTime):
-        logger.warning('当日交易未开始,不进行更新')
-        return
+    if not isTradeDay or not isTradeTime:
+        dateStr = next_trade_date(dateStr, offset=-1)
     df = em.stock_zh_a_spot_em()
     df = df[df['最新价'].notna()]
     df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
@@ -159,8 +159,9 @@ def update_k_data_daliy():
         data = pd.DataFrame(columns=['日期', '代码', '名称', '开盘', '收盘', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比'])
         if(exists):
             data = pd.read_csv(file_name, dtype={'代码': str})
-            data = data[~(data['日期'] == todayStr)]
+            data = data[~(data['日期'] == dateStr)]
         data = data.append(row)
+        data.sort_values(by='日期', inplace=True)
         # 结果集输出到csv文件
         data.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
         logger.info(code + ':更新成功.')
@@ -420,10 +421,104 @@ def update_index():
     更新指数列表
     """
     df = sina.stock_zh_index_spot()
+    df = df[~(df['名称'] == '')]
     df = df[['代码', '名称']]
+    df.rename(columns={'代码': 'sina_code'}, inplace=True)
+    df['代码'] = df['sina_code'].map(lambda x: x[2:])
     df.to_csv(cons.index_list_file, encoding='utf-8', index=False)
     logger.info('指数列表更新结束')
 
 
+# 每日更新指数数据
+def update_index_daily():
+    """
+    每日更新指数数据
+    """
+    today = datetime.datetime.today()
+    dateStr = today.strftime('%Y-%m-%d')
+    isTradeDay = is_trade_date(dateStr)
+    isTradeTime = int(today.strftime('%H%M%S')) - int(datetime.time(9, 30, 0).strftime('%H%M%S')) > 0
+    if not isTradeDay or not isTradeTime:
+        dateStr = next_trade_date(dateStr, offset=-1)
+    df = sina.stock_zh_index_spot()
+    df = df[~(df['名称'] == '')]
+    df['代码'] = df['代码'].map(lambda x: x[2:])
+    df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额']]
+    df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
+    df.insert(1, '日期', dateStr)
+    logger.info('更新每日股票数据开始.')
+    for index in df.index:
+        row = df.loc[index, :]
+        code = getattr(row, '代码')
+        name = getattr(row, '名称')
+        file_name = os.path.join(cons.index_history_path, code + ".csv")
+        exists = os.path.exists(file_name)
+        data = pd.DataFrame(columns=['日期', '代码', '名称', '开盘', '收盘', '最高', '最低', '成交量', '成交额'])
+        if(exists):
+            data = pd.read_csv(file_name, dtype={'代码': str})
+            data = data[~(data['日期'] == dateStr)]
+        data = data.append(row)
+        data.sort_values(by='日期', inplace=True)
+        # 结果集输出到csv文件
+        data.to_csv(os.path.join(cons.index_history_path, code + ".csv"), encoding="utf-8", index=False)
+        logger.info('[' + code + ']' + name + ':更新成功.')
+    logger.info('更新每日指数数据结束.')
+
+
+# 保存指数历史日频数据
+def update_index_history():
+    """
+    保存指数历史日频数据
+    """
+    basic = pd.read_csv(cons.index_list_file, dtype={'代码': str})
+    for index in basic.index:
+        row = basic.loc[index, :]
+        scode = row['sina_code']
+        code = row['代码']
+        name = row['名称']
+        try:
+            data = sina.stock_zh_index_daily(symbol=scode)
+            data.rename(columns={'date': '日期', 'open': '开盘', 'close': '收盘', 'high': '最高', 'low': '最低', 'volume': '成交量'}, inplace=True)
+            data.insert(1, '代码', code)
+            data.insert(2, '名称', name)
+            data.to_csv(os.path.join(cons.index_history_path, code + ".csv"), encoding="utf-8", index=False)
+            logger.info('[' + code + ']' + name + ' 采集成功')
+            util.sleep()
+        except BaseException:
+            logger.error('[' + code + ']' + name + ' 采集失败,原因:' + traceback.format_exc())
+    logger.info('指数日频数据更新成功')
+
+
+# 更新指数成分股
+def update_index_stocks():
+    """
+    更新指数成分股
+    """
+    if not os.path.exists(cons.index_list_file):
+        logger.info('需先更新指数列表')
+        return
+    index_list = pd.read_csv(cons.index_list_file, dtype={'代码': str})
+    if(os.path.exists(cons.index_stocks_file)):
+        stocks = pd.read_csv(cons.index_stocks_file)
+    else:
+        stocks = pd.DataFrame()
+    for index in index_list.index:
+        row = index_list.loc[index, :]
+        code = row['代码']
+        name = row['名称']
+        temp = sina.index_stock_cons(code)
+        temp.rename(columns={'品种代码': '代码', '品种名称': '名称'}, inplace=True)
+        temp['指数代码'] = code
+        temp['指数名称'] = name
+        if stocks.empty:
+            stocks = temp
+        else:
+            stocks = stocks[~(stocks['指数代码'] == int(code))]
+            stocks = stocks.append(temp)
+        stocks.to_csv(cons.index_stocks_file, encoding="utf-8", index=False)
+        logger.info('[' + code + ']' + name + ' 更新成功')
+    logger.info('更新指数成分股结束')
+
+
 if __name__ == '__main__':
-    update_index()
+    update_index_stocks()

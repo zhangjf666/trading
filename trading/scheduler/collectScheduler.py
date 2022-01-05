@@ -12,9 +12,8 @@ scheduler = BlockingScheduler()
 
 
 def update_stock_task():
-    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
-        logger.warning('非交易日,不进行更新.')
-        return
+    # 更新交易日信息
+    sc.save_tradeday()
     # 股票基本信息
     sc.save_stock_basic()
     # 当日K线
@@ -31,9 +30,6 @@ def update_stock_task():
 
 
 def update_board_task():
-    if not (sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d'))):
-        logger.warning('非交易日,不进行更新.')
-        return
     # 板块指数相关
     sc.update_industry_board()
     sc.update_concept_board()
@@ -46,6 +42,13 @@ def update_board_task():
     ma_higher.select_board_index_ma('2')
 
 
+def update_index_task():
+    # 指数更新相关
+    sc.update_index()
+    sc.update_index_daily()
+    sc.update_index_stocks()
+
+
 if __name__ == '__main__':
     # now = datetime.datetime(2021, 1, 1, 20, 0, 0)
     now = datetime.datetime.now()
@@ -53,7 +56,11 @@ if __name__ == '__main__':
     # 添加股票数据更新任务
     scheduler.add_job(update_stock_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 添加板块数据更新任务
+    nexttime = nexttime + datetime.timedelta(minutes=1)
     scheduler.add_job(update_board_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 添加指数数据更新任务
+    nexttime = nexttime + datetime.timedelta(minutes=1)
+    scheduler.add_job(update_index_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
 
     try:
         # 开始调度
