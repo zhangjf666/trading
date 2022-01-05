@@ -13,6 +13,7 @@ import trading.collector.constant as cons
 import trading.api.eastmoney as em
 import trading.api.ths as ths
 import trading.api.sina as sina
+import trading.api.common as api
 from trading.config.logger import logger
 import trading.util.common_util as util
 
@@ -503,20 +504,23 @@ def update_index_stocks():
     else:
         stocks = pd.DataFrame()
     for index in index_list.index:
-        row = index_list.loc[index, :]
-        code = row['代码']
-        name = row['名称']
-        temp = sina.index_stock_cons(code)
-        temp.rename(columns={'品种代码': '代码', '品种名称': '名称'}, inplace=True)
-        temp['指数代码'] = code
-        temp['指数名称'] = name
-        if stocks.empty:
-            stocks = temp
-        else:
-            stocks = stocks[~(stocks['指数代码'] == int(code))]
-            stocks = stocks.append(temp)
-        stocks.to_csv(cons.index_stocks_file, encoding="utf-8", index=False)
-        logger.info('[' + code + ']' + name + ' 更新成功')
+        try:
+            row = index_list.loc[index, :]
+            code = row['代码']
+            name = row['名称']
+            temp = api.index_stock_cons_csindex(code)
+            temp['指数代码'] = code
+            temp['指数名称'] = name
+            if stocks.empty:
+                stocks = temp
+            else:
+                stocks = stocks[~(stocks['指数代码'] == int(code))]
+                stocks = stocks.append(temp)
+            stocks.to_csv(cons.index_stocks_file, encoding="utf-8", index=False)
+            logger.info('[' + code + ']' + name + ' 更新成功')
+            util.sleep()
+        except BaseException:
+            logger.error('[' + code + ']' + name + ' 采集失败,原因:' + traceback.format_exc())
     logger.info('更新指数成分股结束')
 
 
