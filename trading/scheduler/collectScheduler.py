@@ -11,7 +11,8 @@ from trading.strategy import ma_higher, oversoldNewStock
 scheduler = BlockingScheduler()
 
 
-def update_stock_task():
+# 日频任务
+def daily_task():
     # 更新交易日信息
     sc.save_tradeday()
     # 股票基本信息
@@ -28,24 +29,27 @@ def update_stock_task():
     oversoldNewStock.selectOversoldStock()
     oversoldNewStock.sellOverStock()
 
-
-def update_board_task():
     # 板块指数相关
     sc.update_industry_board()
     sc.update_concept_board()
-    sc.update_industry_stocks()
-    sc.update_concept_stocks()
     sc.update_all_industry_index()
     sc.update_all_concept_index()
     # 指数均线策略
     ma_higher.select_board_index_ma('1')
     ma_higher.select_board_index_ma('2')
 
-
-def update_index_task():
     # 指数更新相关
     sc.update_index()
     sc.update_index_daily()
+
+
+# 周频任务
+def weekly_task():
+    # 板块相关
+    sc.update_industry_stocks()
+    sc.update_concept_stocks()
+
+    # 指数相关
     sc.update_index_stocks()
 
 
@@ -53,14 +57,10 @@ if __name__ == '__main__':
     # now = datetime.datetime(2021, 1, 1, 20, 0, 0)
     now = datetime.datetime.now()
     nexttime = now + datetime.timedelta(minutes=1)
-    # 添加股票数据更新任务
-    scheduler.add_job(update_stock_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
-    # 添加板块数据更新任务
-    nexttime = nexttime + datetime.timedelta(minutes=1)
-    scheduler.add_job(update_board_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
-    # 添加指数数据更新任务
-    nexttime = nexttime + datetime.timedelta(minutes=1)
-    scheduler.add_job(update_index_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 日频任务
+    scheduler.add_job(daily_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # 周频任务
+    scheduler.add_job(weekly_task, 'cron', day_of_week='mon', hour=20, minute=0)
 
     try:
         # 开始调度
