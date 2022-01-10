@@ -1,4 +1,5 @@
 # 导入模块
+from logging import log
 import sys,os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import datetime
@@ -15,6 +16,9 @@ scheduler = BlockingScheduler()
 def daily_task():
     # 更新交易日信息
     sc.save_tradeday()
+    if not sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d')):
+        logger.info('非交易日,不进行采集')
+        return
     # 股票基本信息
     sc.save_stock_basic()
     # 当日K线
@@ -41,6 +45,31 @@ def daily_task():
     # 指数更新相关
     sc.update_index()
     sc.update_index_daily()
+
+    # 机构调研
+    sc.update_jgdy_tj()
+    # 技术指标
+    sc.update_cxg_daily()
+    sc.update_cxd_daily()
+    sc.update_lxsz_daily()
+    sc.update_lxxd_daily()
+    sc.update_cxfl_daily()
+    sc.update_cxsl_daily()
+    sc.update_ljqs_daily()
+    sc.update_ljqd_daily()
+    # 资金排行
+    sc.update_ggzj_daily(symbol='3日排行')
+    sc.update_ggzj_daily(symbol='5日排行')
+    sc.update_ggzj_daily(symbol='10日排行')
+    sc.update_ggzj_daily(symbol='20日排行')
+    sc.update_gnzj_daily(symbol='3日排行')
+    sc.update_gnzj_daily(symbol='5日排行')
+    sc.update_gnzj_daily(symbol='10日排行')
+    sc.update_gnzj_daily(symbol='20日排行')
+    sc.update_hyzj_daily(symbol='3日排行')
+    sc.update_hyzj_daily(symbol='5日排行')
+    sc.update_hyzj_daily(symbol='10日排行')
+    sc.update_hyzj_daily(symbol='20日排行')
 
 
 # 周频任务

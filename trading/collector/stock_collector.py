@@ -447,7 +447,7 @@ def update_index_daily():
     df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
     df.insert(1, '日期', dateStr)
-    logger.info('更新每日股票数据开始.')
+    logger.info('更新每日指数数据开始.')
     for index in df.index:
         row = df.loc[index, :]
         code = getattr(row, '代码')
@@ -524,5 +524,221 @@ def update_index_stocks():
     logger.info('更新指数成分股结束')
 
 
+# 机构调研统计
+def update_jgdy_tj():
+    """
+    更新机构调研统计
+    """
+    start_date = '2022-01-01'
+    df = pd.DataFrame()
+    if os.path.exists(cons.jgdytj_file):
+        df = pd.read_csv(cons.jgdytj_file, dtype={'代码': str})
+        df.sort_values(by='接待日期', inplace=True)
+        start_date = df['接待日期'].values[-1]
+    logger.info('更新机构调研统计开始.更新时间: ' + start_date)
+    try:
+        temp = em.stock_em_jgdy_tj(start_date)
+        temp = temp[["代码", "名称",  "接待机构数量", "接待方式", "接待人员", "接待地点", "接待日期", "公告日期"]]
+        df = df.append(temp)
+        df.to_csv(cons.jgdytj_file, encoding="utf-8", index=False)
+    except BaseException:
+        logger.error('更新机构调研统计出错:' + traceback.format_exc())
+    logger.info('更新机构调研统计结束')
+
+
+# 每日更新创新高技术指标
+def update_cxg_daily():
+    """
+    创新高技术指标
+    """
+    logger.info('更新创新高技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_cxg_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    if os.path.exists(cons.cxg_file):
+        df.to_csv(cons.cxg_file, mode='a', header=False, encoding="utf-8", index=False)
+    else:
+        df.to_csv(cons.cxg_file, encoding="utf-8", index=False)
+    logger.info('更新创新高技术指标结束.')
+
+
+# 每日更新创新高技术指标
+def update_cxd_daily():
+    """
+    创新低技术指标
+    """
+    logger.info('更新创新低技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_cxd_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    if os.path.exists(cons.cxd_file):
+        df.to_csv(cons.cxd_file, mode='a', header=False, encoding="utf-8", index=False)
+    else:
+        df.to_csv(cons.cxd_file, encoding="utf-8", index=False)
+    logger.info('更新创新低技术指标结束.')
+
+
+# 每日更新连续上涨技术指标
+def update_lxsz_daily():
+    """
+    连续上涨技术指标
+    """
+    logger.info('更新连续上涨技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_lxsz_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.lxsz_file, encoding="utf-8", index=False)
+    logger.info('更新连续上涨技术指标结束.')
+
+
+# 每日更新连续下跌技术指标
+def update_lxxd_daily():
+    """
+    连续下跌技术指标
+    """
+    logger.info('更新连续下跌技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_lxxd_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.lxxd_file, encoding="utf-8", index=False)
+    logger.info('更新连续下跌技术指标结束.')
+
+
+# 每日更新持续放量技术指标
+def update_cxfl_daily():
+    """
+    持续放量技术指标
+    """
+    logger.info('更新持续放量技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_cxfl_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.cxfl_file, encoding="utf-8", index=False)
+    logger.info('更新持续放量技术指标结束.')
+
+
+# 每日更新持续缩量技术指标
+def update_cxsl_daily():
+    """
+    持续缩量技术指标
+    """
+    logger.info('更新持续缩量技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_cxsl_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.cxsl_file, encoding="utf-8", index=False)
+    logger.info('更新持续缩量技术指标结束.')
+
+
+# 每日更新量价齐升技术指标
+def update_ljqs_daily():
+    """
+    量价齐升技术指标
+    """
+    logger.info('更新量价齐升技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_ljqs_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.ljqs_file, encoding="utf-8", index=False)
+    logger.info('更新量价齐升技术指标结束.')
+
+
+# 每日更新量价齐跌技术指标
+def update_ljqd_daily():
+    """
+    量价齐跌技术指标
+    """
+    logger.info('更新量价齐跌技术指标开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_rank_ljqd_ths()
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(cons.ljqd_file, encoding="utf-8", index=False)
+    logger.info('更新量价齐跌技术指标结束.')
+
+
+# 每日个股资金排行
+def update_ggzj_daily(symbol: str = "5日排行"):
+    """
+    个股资金排行
+    :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
+    """
+    logger.info('更新个股资金' + symbol + '排行开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_fund_flow_individual(symbol)
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(os.path.join(cons.zjlx_path, 'ggzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+    logger.info('更新个股资金' + symbol + '排行结束.')
+
+
+# 每日概念资金排行
+def update_gnzj_daily(symbol: str = "5日排行"):
+    """
+    概念资金排行
+    :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
+    """
+    logger.info('更新概念资金' + symbol + '排行开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_fund_flow_concept(symbol)
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(os.path.join(cons.zjlx_path, 'gnzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+    logger.info('更新概念资金' + symbol + '排行结束.')
+
+
+# 每日行业资金排行
+def update_hyzj_daily(symbol: str = "5日排行"):
+    """
+    行业资金排行
+    :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
+    """
+    logger.info('更新行业资金' + symbol + '排行开始.')
+    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+    df = ths.stock_fund_flow_industry(symbol)
+    df.drop(columns=['序号'], inplace=True)
+    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+    df.insert(0, '日期', dateStr)
+    df.to_csv(os.path.join(cons.zjlx_path, 'hyzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+    logger.info('更新行业资金' + symbol + '排行结束.')
+
+
 if __name__ == '__main__':
-    update_index_stocks()
+    update_jgdy_tj()
+    update_cxg_daily()
+    update_cxd_daily()
+    update_lxsz_daily()
+    update_lxxd_daily()
+    update_cxfl_daily()
+    update_cxsl_daily()
+    update_ljqs_daily()
+    update_ljqd_daily()
+    update_ggzj_daily(symbol='3日排行')
+    update_ggzj_daily(symbol='5日排行')
+    update_ggzj_daily(symbol='10日排行')
+    update_ggzj_daily(symbol='20日排行')
+    update_gnzj_daily(symbol='3日排行')
+    update_gnzj_daily(symbol='5日排行')
+    update_gnzj_daily(symbol='10日排行')
+    update_gnzj_daily(symbol='20日排行')
+    update_hyzj_daily(symbol='3日排行')
+    update_hyzj_daily(symbol='5日排行')
+    update_hyzj_daily(symbol='10日排行')
+    update_hyzj_daily(symbol='20日排行')

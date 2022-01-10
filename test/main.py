@@ -17,5 +17,5 @@ pd.set_option('display.max_columns', None)
 # 显示所有行
 pd.set_option('display.max_rows', None)
 
-df = capi.index_stock_cons_csindex('000013')
+df = ak.stock_fund_flow_industry()
 print(df)

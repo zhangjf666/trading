@@ -109,3 +109,48 @@ index_stocks_file = os.path.join(index_path, index_stocks_file_name)
 # 概念板块指数文件夹
 index_history_path = os.path.join(index_path, "index_history")
 fileUtil.createPath(index_history_path)
+
+# 机构调研统计文件名
+jgdytj_file_name = "jgdytj.csv"
+# 机构调研统计文件
+jgdytj_file = os.path.join(stock_path, jgdytj_file_name)
+
+# 技术指标文件夹
+jszb_path = os.path.join(stock_path, "jszb")
+fileUtil.createPath(jszb_path)
+# 创新高文件名
+cxg_file_name = "cxg.csv"
+# 创新高文件
+cxg_file = os.path.join(jszb_path, cxg_file_name)
+# 创新低文件名
+cxd_file_name = "cxd.csv"
+# 创新低文件
+cxd_file = os.path.join(jszb_path, cxd_file_name)
+# 连续上涨文件名
+lxsz_file_name = "lxsz.csv"
+# 连续上涨文件
+lxsz_file = os.path.join(jszb_path, lxsz_file_name)
+# 连续下跌文件名
+lxxd_file_name = "lxxd.csv"
+# 连续下跌文件
+lxxd_file = os.path.join(jszb_path, lxxd_file_name)
+# 持续放量文件名
+cxfl_file_name = "cxfl.csv"
+# 持续放量文件
+cxfl_file = os.path.join(jszb_path, cxfl_file_name)
+# 持续缩量文件名
+cxsl_file_name = "cxsl.csv"
+# 持续缩量文件
+cxsl_file = os.path.join(jszb_path, cxsl_file_name)
+# 量价齐升文件名
+ljqs_file_name = "ljqs.csv"
+# 量价齐升文件
+ljqs_file = os.path.join(jszb_path, ljqs_file_name)
+# 量价齐跌文件名
+ljqd_file_name = "ljqd.csv"
+# 量价齐跌文件
+ljqd_file = os.path.join(jszb_path, ljqd_file_name)
+
+# 资金流向文件夹
+zjlx_path = os.path.join(stock_path, "zjxl")
+fileUtil.createPath(zjlx_path)
