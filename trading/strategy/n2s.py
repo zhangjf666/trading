@@ -136,9 +136,7 @@ def get_n2s_strategy_data(code,
             's_der'] = n2s['der'] * n2s['point']
     n2s['s_net'] = [round(x, 4) for x in (n2s['s_der'] + 1.0).cumprod()]
     n2s['net'] = [round(x, 4) for x in (n2s['der'] + 1.0).cumprod()]
-    print(n2s[n2s['net'].isna()])
     return n2s.loc[n2s.index, [
-        '日期',
         '代码',
         '名称',
         'operation',
@@ -206,8 +204,9 @@ def get_n2s_strategy_detail(code,
             by=['s_net'], ascending=False).iloc[[0],
                                                 n2s.columns.get_loc('s_net')]
     result['s_max_point'] = s_max_point_total.index.format()[0]
-    result['s_max_drawdown'] = round((1 - s_min_point_total.values[0]) * 100,
-                                     2)
+    result['s_max_drawdown'] = round((1 - s_min_point_total.values[0]) * 100, 2)
+    n2s.reset_index(inplace=True)
+    n2s['日期'] = n2s['日期'].astype(str)
     data = {
         'summary': result,
         'detail': json.loads(n2s.to_json(orient='records'))
