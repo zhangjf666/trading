@@ -3,6 +3,9 @@
 Date: 2021-11-29 22:00:56
 Desc: 统一返回结果
 """
+import json
+
+
 class APIResponse():
     msg = 'ok'
     code = 0
@@ -13,7 +16,10 @@ class APIResponse():
             self.code = code
         if msg:
             self.msg = msg
-        self.data = data
+        if type(data) == str:
+            self.data = json.loads(data)
+        else:
+            self.data = data
 
     def body(self):
         body = {}

@@ -136,6 +136,7 @@ def get_n2s_strategy_data(code,
             's_der'] = n2s['der'] * n2s['point']
     n2s['s_net'] = [round(x, 4) for x in (n2s['s_der'] + 1.0).cumprod()]
     n2s['net'] = [round(x, 4) for x in (n2s['der'] + 1.0).cumprod()]
+    print(n2s[n2s['net'].isna()])
     return n2s.loc[n2s.index, [
         '日期',
         '代码',

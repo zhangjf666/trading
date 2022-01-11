@@ -4,6 +4,7 @@ Date: 2021-01-14 22:00:56
 Desc: 股票数据获取
 """
 
+from logging import log
 import traceback
 import pandas as pd
 import os
@@ -541,9 +542,9 @@ def update_jgdy_tj():
         temp = temp[["代码", "名称",  "接待机构数量", "接待方式", "接待人员", "接待地点", "接待日期", "公告日期"]]
         df = df.append(temp)
         df.to_csv(cons.jgdytj_file, encoding="utf-8", index=False)
+        logger.info('更新机构调研统计结束')
     except BaseException:
         logger.error('更新机构调研统计出错:' + traceback.format_exc())
-    logger.info('更新机构调研统计结束')
 
 
 # 每日更新创新高技术指标
@@ -551,35 +552,41 @@ def update_cxg_daily():
     """
     创新高技术指标
     """
-    logger.info('更新创新高技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_cxg_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    if os.path.exists(cons.cxg_file):
-        df.to_csv(cons.cxg_file, mode='a', header=False, encoding="utf-8", index=False)
-    else:
-        df.to_csv(cons.cxg_file, encoding="utf-8", index=False)
-    logger.info('更新创新高技术指标结束.')
+    try:
+        logger.info('更新创新高技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_cxg_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        if os.path.exists(cons.cxg_file):
+            df.to_csv(cons.cxg_file, mode='a', header=False, encoding="utf-8", index=False)
+        else:
+            df.to_csv(cons.cxg_file, encoding="utf-8", index=False)
+        logger.info('更新创新高技术指标结束.')
+    except BaseException:
+        logger.error('更新创新高技术指标出错:' + traceback.format_exc())
 
 
-# 每日更新创新高技术指标
+# 每日更新创新低技术指标
 def update_cxd_daily():
     """
     创新低技术指标
     """
-    logger.info('更新创新低技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_cxd_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    if os.path.exists(cons.cxd_file):
-        df.to_csv(cons.cxd_file, mode='a', header=False, encoding="utf-8", index=False)
-    else:
-        df.to_csv(cons.cxd_file, encoding="utf-8", index=False)
-    logger.info('更新创新低技术指标结束.')
+    try:
+        logger.info('更新创新低技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_cxd_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        if os.path.exists(cons.cxd_file):
+            df.to_csv(cons.cxd_file, mode='a', header=False, encoding="utf-8", index=False)
+        else:
+            df.to_csv(cons.cxd_file, encoding="utf-8", index=False)
+        logger.info('更新创新低技术指标结束.')
+    except BaseException:
+        logger.error('更新创新低技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新连续上涨技术指标
@@ -587,14 +594,17 @@ def update_lxsz_daily():
     """
     连续上涨技术指标
     """
-    logger.info('更新连续上涨技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_lxsz_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.lxsz_file, encoding="utf-8", index=False)
-    logger.info('更新连续上涨技术指标结束.')
+    try:
+        logger.info('更新连续上涨技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_lxsz_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.lxsz_file, encoding="utf-8", index=False)
+        logger.info('更新连续上涨技术指标结束.')
+    except BaseException:
+        logger.error('更新连续上涨技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新连续下跌技术指标
@@ -602,14 +612,17 @@ def update_lxxd_daily():
     """
     连续下跌技术指标
     """
-    logger.info('更新连续下跌技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_lxxd_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.lxxd_file, encoding="utf-8", index=False)
-    logger.info('更新连续下跌技术指标结束.')
+    try:
+        logger.info('更新连续下跌技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_lxxd_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.lxxd_file, encoding="utf-8", index=False)
+        logger.info('更新连续下跌技术指标结束.')
+    except BaseException:
+        logger.error('更新连续下跌技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新持续放量技术指标
@@ -617,14 +630,17 @@ def update_cxfl_daily():
     """
     持续放量技术指标
     """
-    logger.info('更新持续放量技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_cxfl_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.cxfl_file, encoding="utf-8", index=False)
-    logger.info('更新持续放量技术指标结束.')
+    try:
+        logger.info('更新持续放量技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_cxfl_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.cxfl_file, encoding="utf-8", index=False)
+        logger.info('更新持续放量技术指标结束.')
+    except BaseException:
+        logger.error('更新持续放量技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新持续缩量技术指标
@@ -632,14 +648,17 @@ def update_cxsl_daily():
     """
     持续缩量技术指标
     """
-    logger.info('更新持续缩量技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_cxsl_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.cxsl_file, encoding="utf-8", index=False)
-    logger.info('更新持续缩量技术指标结束.')
+    try:
+        logger.info('更新持续缩量技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_cxsl_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.cxsl_file, encoding="utf-8", index=False)
+        logger.info('更新持续缩量技术指标结束.')
+    except BaseException:
+        logger.error('更新持续缩量技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新量价齐升技术指标
@@ -647,14 +666,17 @@ def update_ljqs_daily():
     """
     量价齐升技术指标
     """
-    logger.info('更新量价齐升技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_ljqs_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.ljqs_file, encoding="utf-8", index=False)
-    logger.info('更新量价齐升技术指标结束.')
+    try:
+        logger.info('更新量价齐升技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_ljqs_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.ljqs_file, encoding="utf-8", index=False)
+        logger.info('更新量价齐升技术指标结束.')
+    except BaseException:
+        logger.error('更新量价齐升技术指标出错:' + traceback.format_exc())
 
 
 # 每日更新量价齐跌技术指标
@@ -662,14 +684,17 @@ def update_ljqd_daily():
     """
     量价齐跌技术指标
     """
-    logger.info('更新量价齐跌技术指标开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_rank_ljqd_ths()
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(cons.ljqd_file, encoding="utf-8", index=False)
-    logger.info('更新量价齐跌技术指标结束.')
+    try:
+        logger.info('更新量价齐跌技术指标开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_rank_ljqd_ths()
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(cons.ljqd_file, encoding="utf-8", index=False)
+        logger.info('更新量价齐跌技术指标结束.')
+    except BaseException:
+        logger.error('更新量价齐跌技术指标出错:' + traceback.format_exc())
 
 
 # 每日个股资金排行
@@ -678,14 +703,17 @@ def update_ggzj_daily(symbol: str = "5日排行"):
     个股资金排行
     :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
-    logger.info('更新个股资金' + symbol + '排行开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_fund_flow_individual(symbol)
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(os.path.join(cons.zjlx_path, 'ggzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
-    logger.info('更新个股资金' + symbol + '排行结束.')
+    try:
+        logger.info('更新个股资金' + symbol + '排行开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_fund_flow_individual(symbol)
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(os.path.join(cons.zjlx_path, 'ggzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+        logger.info('更新个股资金' + symbol + '排行结束.')
+    except BaseException:
+        logger.error('更新个股资金' + symbol + '排行出错:' + traceback.format_exc())
 
 
 # 每日概念资金排行
@@ -694,14 +722,17 @@ def update_gnzj_daily(symbol: str = "5日排行"):
     概念资金排行
     :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
-    logger.info('更新概念资金' + symbol + '排行开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_fund_flow_concept(symbol)
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(os.path.join(cons.zjlx_path, 'gnzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
-    logger.info('更新概念资金' + symbol + '排行结束.')
+    try:
+        logger.info('更新概念资金' + symbol + '排行开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_fund_flow_concept(symbol)
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(os.path.join(cons.zjlx_path, 'gnzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+        logger.info('更新概念资金' + symbol + '排行结束.')
+    except BaseException:
+        logger.error('更新概念资金' + symbol + '排行出错:' + traceback.format_exc())
 
 
 # 每日行业资金排行
@@ -710,14 +741,17 @@ def update_hyzj_daily(symbol: str = "5日排行"):
     行业资金排行
     :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
-    logger.info('更新行业资金' + symbol + '排行开始.')
-    dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-    df = ths.stock_fund_flow_industry(symbol)
-    df.drop(columns=['序号'], inplace=True)
-    df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
-    df.insert(0, '日期', dateStr)
-    df.to_csv(os.path.join(cons.zjlx_path, 'hyzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
-    logger.info('更新行业资金' + symbol + '排行结束.')
+    try:
+        logger.info('更新行业资金' + symbol + '排行开始.')
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        df = ths.stock_fund_flow_industry(symbol)
+        df.drop(columns=['序号'], inplace=True)
+        df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
+        df.insert(0, '日期', dateStr)
+        df.to_csv(os.path.join(cons.zjlx_path, 'hyzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
+        logger.info('更新行业资金' + symbol + '排行结束.')
+    except BaseException:
+        logger.error('更新行业资金' + symbol + '排行出错:' + traceback.format_exc())
 
 
 if __name__ == '__main__':

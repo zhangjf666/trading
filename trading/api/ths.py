@@ -968,9 +968,9 @@ def stock_fund_flow_concept(symbol: str = "即时") -> pd.DataFrame:
         big_df.columns = [
             "序号",
             "代码",
-            "行业",
-            "行业指数",
-            "行业-涨跌幅",
+            "名称",
+            "概念指数",
+            "概念-涨跌幅",
             "流入资金",
             "流出资金",
             "净额",
@@ -987,9 +987,9 @@ def stock_fund_flow_concept(symbol: str = "即时") -> pd.DataFrame:
         big_df.columns = [
             "序号",
             "代码",
-            "行业",
+            "名称",
             "公司家数",
-            "行业指数",
+            "概念指数",
             "阶段涨跌幅",
             "流入资金",
             "流出资金",
@@ -1087,7 +1087,7 @@ def stock_fund_flow_industry(symbol: str = "即时") -> pd.DataFrame:
         big_df.columns = [
             "序号",
             "代码",
-            "行业",
+            "名称",
             "行业指数",
             "行业-涨跌幅",
             "流入资金",
@@ -1106,7 +1106,7 @@ def stock_fund_flow_industry(symbol: str = "即时") -> pd.DataFrame:
         big_df.columns = [
             "序号",
             "代码",
-            "行业",
+            "名称",
             "公司家数",
             "行业指数",
             "阶段涨跌幅",

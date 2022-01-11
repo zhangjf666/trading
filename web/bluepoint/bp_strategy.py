@@ -13,7 +13,7 @@ import pandas as pd
 import trading.collector.constant as ccons
 import trading.strategy.constant as scons
 import trading.strategy.n2s as tsn
-import json
+import trading.util.common_util as cutil
 
 strategy = Blueprint('strategy', __name__, url_prefix='/strategy')
 
@@ -31,7 +31,7 @@ def select_oversold_stock(query: OverSoldRequest):
     df['总市值'] = (df['总市值'].astype(float)/100000000).round(2)
     df['流通市值'] = (df['流通市值'].astype(float)/100000000).round(2)
     df.rename(columns={'总市值': '总市值(亿)', '流通市值': '流通市值(亿)'}, inplace=True)
-    return df.to_dict(orient='records') if df.shape[0] > 0 else []
+    return cutil.to_json(df)
 
 
 @route(strategy, '/sell-over-stock')
@@ -42,7 +42,7 @@ def sell_over_stock(query: OverSoldRequest):
     df['涨幅'] = (df['涨幅'].astype(float) * 100).round(2)
     df['跌幅'] = (df['跌幅'].astype(float) * 100).round(2)
     df.rename(columns={'涨幅': '涨幅(%)', '跌幅': '跌幅(%)'}, inplace=True)
-    return df.to_dict(orient='records') if df.shape[0] > 0 else []
+    return cutil.to_json(df)
 
 
 class StockMaRequest(BaseModel):
@@ -77,7 +77,7 @@ def stock_ma(query: StockMaRequest):
     result['总市值'] = (result['总市值'].astype(float)/100000000).round(2)
     result['流通市值'] = (result['流通市值'].astype(float)/100000000).round(2)
     result.rename(columns={'总市值': '总市值(亿)', '流通市值': '流通市值(亿)'}, inplace=True)
-    return result.to_dict(orient='records') if result.shape[0] > 0 else []
+    return cutil.to_json(result)
 
 
 class IndexMaRequest(BaseModel):
@@ -110,7 +110,7 @@ def IndexMa(query: IndexMaRequest):
     df['成交量'] = (df['成交量'].astype(float)/100000000).round(2)
     df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
     df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
-    return df.to_dict(orient='records') if df.shape[0] > 0 else []
+    return cutil.to_json(df)
 
 
 class N2sSignRequest(BaseModel):
@@ -121,7 +121,7 @@ class N2sSignRequest(BaseModel):
 @route(strategy, '/n2s-sign')
 def N2sSign(query: N2sSignRequest):
     df = tsn.show_n2s_sign(multiple=query.multiple, period=query.period)
-    return json.loads(df.to_json(orient='records'))
+    return cutil.to_json(df)
 
 
 class N2sSignTestRequest(BaseModel):
@@ -135,6 +135,5 @@ class N2sSignTestRequest(BaseModel):
 
 @route(strategy, '/n2s-sign-test')
 def N2sSignTestData(query: N2sSignTestRequest):
-    print(query)
     result = tsn.get_n2s_strategy_detail(code=query.code, code_type=query.codeType, start_date=query.startDate, end_date=query.endDate, multiple=query.multiple, period=query.period)
     return result
