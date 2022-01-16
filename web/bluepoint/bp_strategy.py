@@ -5,6 +5,7 @@ Desc: 策略路由
 """
 from datetime import date
 import os
+import traceback
 from flask import Blueprint
 from pydantic import BaseModel
 from web.api_exception import APIException
@@ -14,6 +15,7 @@ import trading.collector.constant as ccons
 import trading.strategy.constant as scons
 import trading.strategy.n2s as tsn
 import trading.util.common_util as cutil
+from trading.config.logger import logger
 
 strategy = Blueprint('strategy', __name__, url_prefix='/strategy')
 
@@ -52,6 +54,7 @@ class StockMaRequest(BaseModel):
     maxMarketValue: int = 65535
     industrys: list = None
     concepts: list = None
+    jszb: list = None
 
 
 @route(strategy, '/stock-ma')
@@ -70,7 +73,16 @@ def stock_ma(query: StockMaRequest):
         result = result.append(df[df['代码'].isin(con_df['代码'])])
     if len(result) == 0:
         result = df
+    # 叠加技术指标
+    if query.jszb:
+        for zb in query.jszb:
+            try:
+                zb_df = pd.read_csv(os.path.join(ccons.jszb_path, zb + ccons.file_type_csv), dtype={'代码': str})
+                result = result[result['代码'].isin(zb_df['代码'])]
+            except BaseException:
+                logger.info('叠加技术指标' + zb + '出错:' + traceback.print_exc())
     # 进行市值和持续天数排序
+    result.drop_duplicates(inplace=True)
     result.sort_values(by=['持续天数', '流通市值'], ascending=[False, False], inplace=True)
     result = result[(result['持续天数'] >= query.miniTrendDay) & (result['持续天数'] <= query.maxTrendDay)]
     result = result[(result['流通市值'] >= query.miniMarketValue * 100000000) & (result['流通市值'] <= query.maxMarketValue * 100000000)]
