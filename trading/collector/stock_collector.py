@@ -701,13 +701,19 @@ def update_ljqd_daily():
 def update_ggzj_daily(symbol: str = "5日排行"):
     """
     个股资金排行
-    :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
+    :param symbol: choice of {“当日排行”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
     try:
+        rang = symbol
+        if symbol == '当日排行':
+            rang = '即时'
         logger.info('更新个股资金' + symbol + '排行开始.')
         dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-        df = ths.stock_fund_flow_individual(symbol)
+        df = ths.stock_fund_flow_individual(rang)
         df.drop(columns=['序号'], inplace=True)
+        if rang == '即时':
+            df.drop(columns=['流入资金', '流出资金', '成交额'], inplace=True)
+            df.rename(columns={'涨跌幅': '阶段涨跌幅', '换手率': '连续换手率', '净额': '资金流入净额'}, inplace=True)
         df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
         df.insert(0, '日期', dateStr)
         df.to_csv(os.path.join(cons.zjlx_path, 'ggzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
@@ -723,10 +729,18 @@ def update_gnzj_daily(symbol: str = "5日排行"):
     :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
     try:
+        rang = symbol
+        if symbol == '当日排行':
+            rang = '即时'
         logger.info('更新概念资金' + symbol + '排行开始.')
         dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-        df = ths.stock_fund_flow_concept(symbol)
+        df = ths.stock_fund_flow_concept(rang)
         df.drop(columns=['序号'], inplace=True)
+        if rang == '即时':
+            company = df['公司家数']
+            df.drop(columns=['领涨股', '领涨股-涨跌幅', '当前价', '公司家数'], inplace=True)
+            df.rename(columns={'概念-涨跌幅': '阶段涨跌幅'}, inplace=True)
+            df.insert(2, '公司家数', company)
         df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
         df.insert(0, '日期', dateStr)
         df.to_csv(os.path.join(cons.zjlx_path, 'gnzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
@@ -742,10 +756,18 @@ def update_hyzj_daily(symbol: str = "5日排行"):
     :param symbol: choice of {“即时”, "3日排行", "5日排行", "10日排行", "20日排行"}
     """
     try:
+        rang = symbol
+        if symbol == '当日排行':
+            rang = '即时'
         logger.info('更新行业资金' + symbol + '排行开始.')
         dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
-        df = ths.stock_fund_flow_industry(symbol)
+        df = ths.stock_fund_flow_industry(rang)
         df.drop(columns=['序号'], inplace=True)
+        if rang == '即时':
+            company = df['公司家数']
+            df.drop(columns=['领涨股', '领涨股-涨跌幅', '当前价', '公司家数'], inplace=True)
+            df.rename(columns={'行业-涨跌幅': '阶段涨跌幅'}, inplace=True)
+            df.insert(2, '公司家数', company)
         df.rename(columns={'股票代码': '代码', '股票简称': '名称'}, inplace=True)
         df.insert(0, '日期', dateStr)
         df.to_csv(os.path.join(cons.zjlx_path, 'hyzj-' + symbol + cons.file_type_csv), encoding="utf-8", index=False)
@@ -755,24 +777,27 @@ def update_hyzj_daily(symbol: str = "5日排行"):
 
 
 if __name__ == '__main__':
-    update_jgdy_tj()
-    update_cxg_daily()
-    update_cxd_daily()
-    update_lxsz_daily()
-    update_lxxd_daily()
-    update_cxfl_daily()
-    update_cxsl_daily()
-    update_ljqs_daily()
-    update_ljqd_daily()
-    update_ggzj_daily(symbol='3日排行')
-    update_ggzj_daily(symbol='5日排行')
-    update_ggzj_daily(symbol='10日排行')
-    update_ggzj_daily(symbol='20日排行')
-    update_gnzj_daily(symbol='3日排行')
-    update_gnzj_daily(symbol='5日排行')
-    update_gnzj_daily(symbol='10日排行')
-    update_gnzj_daily(symbol='20日排行')
-    update_hyzj_daily(symbol='3日排行')
-    update_hyzj_daily(symbol='5日排行')
-    update_hyzj_daily(symbol='10日排行')
-    update_hyzj_daily(symbol='20日排行')
+    # update_jgdy_tj()
+    # update_cxg_daily()
+    # update_cxd_daily()
+    # update_lxsz_daily()
+    # update_lxxd_daily()
+    # update_cxfl_daily()
+    # update_cxsl_daily()
+    # update_ljqs_daily()
+    # update_ljqd_daily()
+    # update_ggzj_daily(symbol='当日排行')
+    # update_ggzj_daily(symbol='3日排行')
+    # update_ggzj_daily(symbol='5日排行')
+    # update_ggzj_daily(symbol='10日排行')
+    # update_ggzj_daily(symbol='20日排行')
+    update_gnzj_daily(symbol='当日排行')
+    # update_gnzj_daily(symbol='3日排行')
+    # update_gnzj_daily(symbol='5日排行')
+    # update_gnzj_daily(symbol='10日排行')
+    # update_gnzj_daily(symbol='20日排行')
+    update_hyzj_daily(symbol='当日排行')
+    # update_hyzj_daily(symbol='3日排行')
+    # update_hyzj_daily(symbol='5日排行')
+    # update_hyzj_daily(symbol='10日排行')
+    # update_hyzj_daily(symbol='20日排行')

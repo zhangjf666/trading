@@ -979,9 +979,9 @@ def stock_fund_flow_concept(symbol: str = "即时") -> pd.DataFrame:
             "领涨股-涨跌幅",
             "当前价",
         ]
-        big_df['行业-涨跌幅'] = big_df['行业-涨跌幅'].str.strip("%")
+        big_df['概念-涨跌幅'] = big_df['概念-涨跌幅'].str.strip("%")
         big_df['领涨股-涨跌幅'] = big_df['领涨股-涨跌幅'].str.strip("%")
-        big_df['行业-涨跌幅'] = pd.to_numeric(big_df['行业-涨跌幅'], errors="coerce")
+        big_df['概念-涨跌幅'] = pd.to_numeric(big_df['概念-涨跌幅'], errors="coerce")
         big_df['领涨股-涨跌幅'] = pd.to_numeric(big_df['领涨股-涨跌幅'], errors="coerce")
     else:
         big_df.columns = [

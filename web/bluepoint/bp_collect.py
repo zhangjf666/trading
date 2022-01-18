@@ -134,7 +134,9 @@ class ZjlxQuery(BaseModel):
 def zjlx(query: ZjlxQuery):
     file_name = ''
     if query.zjType == '0':
-        if query.bdType == '3':
+        if query.bdType == '0':
+            file_name = 'ggzj-当日排行.csv'
+        elif query.bdType == '3':
             file_name = 'ggzj-3日排行.csv'
         elif query.bdType == '5':
             file_name = 'ggzj-5日排行.csv'
@@ -145,7 +147,9 @@ def zjlx(query: ZjlxQuery):
         else:
             raise APIException(400, '不支持的资金流向类型')
     elif query.zjType == '1':
-        if query.bdType == '3':
+        if query.bdType == '0':
+            file_name = 'gnzj-当日排行.csv'
+        elif query.bdType == '3':
             file_name = 'gnzj-3日排行.csv'
         elif query.bdType == '5':
             file_name = 'gnzj-5日排行.csv'
@@ -156,7 +160,9 @@ def zjlx(query: ZjlxQuery):
         else:
             raise APIException(400, '不支持的资金流向类型')
     elif query.zjType == '2':
-        if query.bdType == '3':
+        if query.bdType == '0':
+            file_name = 'hyzj-当日排行.csv'
+        elif query.bdType == '3':
             file_name = 'hyzj-3日排行.csv'
         elif query.bdType == '5':
             file_name = 'hyzj-5日排行.csv'
