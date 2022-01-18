@@ -7,6 +7,7 @@ from datetime import date
 import os
 import traceback
 from flask import Blueprint
+from markupsafe import re
 from pydantic import BaseModel
 from web.api_exception import APIException
 from web.api_route import route
@@ -72,7 +73,10 @@ def stock_ma(query: StockMaRequest):
         con_df = con_df[con_df['概念代码'].isin(query.concepts)]
         result = result.append(df[df['代码'].isin(con_df['代码'])])
     if len(result) == 0:
-        result = df
+        if query.industrys or query.concepts:
+            return cutil.to_json(result)
+        else:
+            result = df
     # 叠加技术指标
     if query.jszb:
         for zb in query.jszb:
