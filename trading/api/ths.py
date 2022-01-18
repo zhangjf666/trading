@@ -852,6 +852,7 @@ def stock_fund_flow_individual(symbol: str = "5日排行") -> pd.DataFrame:
         _sleep()
     del big_df["序号"]
     big_df.reset_index(inplace=True)
+    big_df['股票代码'] = big_df['股票代码'].apply(lambda x: str(x).zfill(6))
     big_df["index"] = range(1, len(big_df) + 1)
     if symbol == "即时":
         big_df.columns = [
@@ -963,6 +964,7 @@ def stock_fund_flow_concept(symbol: str = "即时") -> pd.DataFrame:
     big_code = big_df['代码']
     big_df = big_df.drop('代码', axis=1)
     big_df.insert(1, '代码', big_code)
+    big_df['代码'] = big_df['代码'].apply(lambda x: str(x).zfill(6))
     big_df["index"] = range(1, len(big_df) + 1)
     if symbol == "即时":
         big_df.columns = [
@@ -1082,6 +1084,7 @@ def stock_fund_flow_industry(symbol: str = "即时") -> pd.DataFrame:
     big_code = big_df['代码']
     big_df = big_df.drop('代码', axis=1)
     big_df.insert(1, '代码', big_code)
+    big_df['代码'] = big_df['代码'].apply(lambda x: str(x).zfill(6))
     big_df["index"] = range(1, len(big_df) + 1)
     if symbol == "即时":
         big_df.columns = [
