@@ -4,6 +4,7 @@ Desc: 普通工具类
 """
 import time
 import json
+import re
 
 from pandas.core.frame import DataFrame
 
@@ -19,3 +20,10 @@ def to_json(df: DataFrame):
         return {'columns': [], 'data': []}
     else:
         return {'columns': df.columns.values.tolist(), 'data': json.loads(df.to_json(orient='records'))}
+
+
+# 驼峰转下划线
+def camel_to_underline(name: str):
+    name = name.strip()
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()

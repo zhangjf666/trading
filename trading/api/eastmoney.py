@@ -7,7 +7,16 @@ Desc: 东方财富网-数据获取
 import requests
 import pandas as pd
 import demjson
+from bs4 import BeautifulSoup
 from tqdm import tqdm
+import time
+
+# 设置重试次数
+requests.adapters.DEFAULT_RETRIES = 3
+
+
+def _sleep(secend: int = 1):
+    time.sleep(secend)
 
 
 def stock_zh_a_spot_em() -> pd.DataFrame:
@@ -283,6 +292,380 @@ def stock_em_jgdy_tj(start_date: str = "2021-01-01") -> pd.DataFrame:
     return big_df
 
 
+def stock_em_ggyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") -> pd.DataFrame:
+    """
+    东方财富网-数据中心-研究报告-个股研报
+    https://data.eastmoney.com/report/stock.jshtml
+    :param start_date: 开始时间
+    :type start_date: str
+    :param end_date: 结束时间
+    :type end_date: str
+    :return: 个股研报
+    :rtype: pandas.DataFrame
+    """
+    url = "https://reportapi.eastmoney.com/report/list"
+    params = {
+        'cb': 'datatable7502912',
+        'industryCode': '*',
+        'pageSize': '50',
+        'industry': '*',
+        'rating': '',
+        'ratingChange': '',
+        'beginTime': start_date,
+        'endTime': end_date,
+        'pageNo': 1,
+        'fields': '',
+        'qType': 0,
+        'orgCode': '',
+        'code': '*',
+        'rcode': '',
+        'p': 1,
+        'pageNum': 1,
+        'pageNumber': 1,
+        '_': 1642943357737
+    }
+    r = requests.get(url, params=params)
+    data_text = r.text
+    try:
+        demjson.decode(data_text[data_text.find('{'):-1])
+    except BaseException:
+        return
+    temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+    total_page = temp_df['TotalPage']
+    big_df = pd.DataFrame()
+    for page in tqdm(range(1, total_page+1), leave=False):
+        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        r = requests.get(url, params=params)
+        try:
+            demjson.decode(data_text[data_text.find('{'):-1])
+        except BaseException:
+            continue
+        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+        temp_df = pd.DataFrame(temp_df['data'])
+        summary_list = []
+        download_list = []
+        source_list = []
+        for index in temp_df.index:
+            row = temp_df.iloc[index, :]
+            encode_url = getattr(row, 'encodeUrl')
+            source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
+            r = requests.get(source_url)
+            soup = BeautifulSoup(r.text, "lxml")
+            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+            summary_list.append(summary)
+            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+            download_list.append(download_url)
+            source_list.append(source_url)
+        temp_df['summary'] = summary_list
+        temp_df['downloadUrl'] = download_list
+        temp_df['sourceUrl'] = source_list
+        big_df = big_df.append(temp_df)
+        _sleep()
+    big_df = big_df[
+        [
+            'title',
+            'attachPages',
+            'count',
+            'emRatingName',
+            'stockName',
+            'stockCode',
+            'orgCode',
+            'orgName',
+            'orgSName',
+            'publishDate',
+            'predictThisYearEps',
+            'predictThisYearPe',
+            'predictNextYearEps',
+            'predictNextYearPe',
+            'predictNextTwoYearEps',
+            'predictNextTwoYearPe',
+            'industryCode',
+            'industryName',
+            'indvInduCode',
+            'indvInduName',
+            'researcher',
+            'sRatingName',
+            'summary',
+            'sourceUrl',
+            'downloadUrl',
+            'market'
+        ]
+    ]
+    return big_df
+
+
+def stock_em_hyyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") -> pd.DataFrame:
+    """
+    东方财富网-数据中心-研究报告-行业研报
+    https://data.eastmoney.com/report/industry.jshtml
+    :param start_date: 开始时间
+    :type start_date: str
+    :param end_date: 结束时间
+    :type end_date: str
+    :return: 行业研报
+    :rtype: pandas.DataFrame
+    """
+    url = "https://reportapi.eastmoney.com/report/list"
+    params = {
+        'cb': 'datatable6339771',
+        'industryCode': '*',
+        'pageSize': '50',
+        'industry': '*',
+        'rating': '*',
+        'ratingChange': '*',
+        'beginTime': start_date,
+        'endTime': end_date,
+        'pageNo': 1,
+        'fields': '',
+        'qType': 1,
+        'orgCode': '',
+        'code': '',
+        'rcode': '',
+        'p': 1,
+        'pageNum': 1,
+        'pageNumber': 1,
+        '_': 1643025359466
+    }
+    r = requests.get(url, params=params)
+    data_text = r.text
+    try:
+        demjson.decode(data_text[data_text.find('{'):-1])
+    except BaseException:
+        return
+    temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+    total_page = temp_df['TotalPage']
+    big_df = pd.DataFrame()
+    for page in tqdm(range(1, total_page+1), leave=False):
+        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        r = requests.get(url, params=params)
+        try:
+            demjson.decode(data_text[data_text.find('{'):-1])
+        except BaseException:
+            continue
+        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+        temp_df = pd.DataFrame(temp_df['data'])
+        summary_list = []
+        download_list = []
+        source_list = []
+        for index in temp_df.index:
+            row = temp_df.iloc[index, :]
+            encode_url = getattr(row, 'encodeUrl')
+            source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
+            r = requests.get(source_url)
+            soup = BeautifulSoup(r.text, "lxml")
+            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+            summary_list.append(summary)
+            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+            download_list.append(download_url)
+            source_list.append(source_url)
+        temp_df['summary'] = summary_list
+        temp_df['downloadUrl'] = download_list
+        temp_df['sourceUrl'] = source_list
+        big_df = big_df.append(temp_df)
+        _sleep()
+    big_df = big_df[
+        [
+            'title',
+            'attachPages',
+            'count',
+            'emRatingName',
+            'stockName',
+            'stockCode',
+            'orgCode',
+            'orgName',
+            'orgSName',
+            'publishDate',
+            'predictThisYearEps',
+            'predictThisYearPe',
+            'predictNextYearEps',
+            'predictNextYearPe',
+            'predictNextTwoYearEps',
+            'predictNextTwoYearPe',
+            'industryCode',
+            'industryName',
+            'indvInduCode',
+            'indvInduName',
+            'researcher',
+            'sRatingName',
+            'summary',
+            'sourceUrl',
+            'downloadUrl',
+            'market'
+        ]
+    ]
+    return big_df
+
+
+def stock_em_clyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") -> pd.DataFrame:
+    """
+    东方财富网-数据中心-研究报告-策略研报
+    https://data.eastmoney.com/report/strategyreport.jshtml
+    :param start_date: 开始时间
+    :type start_date: str
+    :param end_date: 结束时间
+    :type end_date: str
+    :return: 策略研报
+    :rtype: pandas.DataFrame
+    """
+    url = "https://reportapi.eastmoney.com/report/jg"
+    params = {
+        'cb': 'datatable6052118',
+        'pageSize': '50',
+        'beginTime': start_date,
+        'endTime': end_date,
+        'pageNo': 1,
+        'fields': '',
+        'qType': 2,
+        'orgCode': '',
+        'author': '',
+        'rcode': '',
+        'p': 1,
+        'pageNum': 1,
+        'pageNumber': 1,
+        '_': 1643025620100
+    }
+    r = requests.get(url, params=params)
+    data_text = r.text
+    try:
+        demjson.decode(data_text[data_text.find('{'):-1])
+    except BaseException:
+        return
+    temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+    total_page = temp_df['TotalPage']
+    big_df = pd.DataFrame()
+    for page in tqdm(range(1, total_page+1), leave=False):
+        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        r = requests.get(url, params=params)
+        try:
+            demjson.decode(data_text[data_text.find('{'):-1])
+        except BaseException:
+            continue
+        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+        temp_df = pd.DataFrame(temp_df['data'])
+        summary_list = []
+        download_list = []
+        source_list = []
+        for index in temp_df.index:
+            row = temp_df.iloc[index, :]
+            encode_url = getattr(row, 'encodeUrl')
+            source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
+            r = requests.get(source_url)
+            soup = BeautifulSoup(r.text, "lxml")
+            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+            summary_list.append(summary)
+            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+            download_list.append(download_url)
+            source_list.append(source_url)
+        temp_df['summary'] = summary_list
+        temp_df['downloadUrl'] = download_list
+        temp_df['sourceUrl'] = source_list
+        big_df = big_df.append(temp_df)
+        _sleep()
+    big_df = big_df[
+        [
+            'title',
+            'count',
+            'orgCode',
+            'orgName',
+            'orgSName',
+            'publishDate',
+            'industryCode',
+            'industryName',
+            'researcher',
+            'summary',
+            'sourceUrl',
+            'downloadUrl',
+            'market'
+        ]
+    ]
+    return big_df
+
+
+def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") -> pd.DataFrame:
+    """
+    东方财富网-数据中心-研究报告-宏观研报
+    https://data.eastmoney.com/report/macresearch.jshtml
+    :param start_date: 开始时间
+    :type start_date: str
+    :param end_date: 结束时间
+    :type end_date: str
+    :return: 宏观研报
+    :rtype: pandas.DataFrame
+    """
+    url = "https://reportapi.eastmoney.com/report/jg"
+    params = {
+        'cb': 'datatable4839298',
+        'pageSize': '50',
+        'beginTime': start_date,
+        'endTime': end_date,
+        'pageNo': 1,
+        'fields': '',
+        'qType': 3,
+        'orgCode': '',
+        'author': '',
+        'rcode': '',
+        'p': 1,
+        'pageNum': 1,
+        'pageNumber': 1,
+        '_': 1643025810644
+    }
+    r = requests.get(url, params=params)
+    data_text = r.text
+    try:
+        demjson.decode(data_text[data_text.find('{'):-1])
+    except BaseException:
+        return
+    temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+    total_page = temp_df['TotalPage']
+    big_df = pd.DataFrame()
+    for page in tqdm(range(1, total_page+1), leave=False):
+        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        r = requests.get(url, params=params)
+        try:
+            demjson.decode(data_text[data_text.find('{'):-1])
+        except BaseException:
+            continue
+        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
+        temp_df = pd.DataFrame(temp_df['data'])
+        summary_list = []
+        download_list = []
+        source_list = []
+        for index in temp_df.index:
+            row = temp_df.iloc[index, :]
+            encode_url = getattr(row, 'encodeUrl')
+            source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
+            r = requests.get(source_url)
+            soup = BeautifulSoup(r.text, "lxml")
+            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+            summary_list.append(summary)
+            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+            download_list.append(download_url)
+            source_list.append(source_url)
+        temp_df['summary'] = summary_list
+        temp_df['downloadUrl'] = download_list
+        temp_df['sourceUrl'] = source_list
+        big_df = big_df.append(temp_df)
+        _sleep()
+    big_df = big_df[
+        [
+            'title',
+            'count',
+            'orgCode',
+            'orgName',
+            'orgSName',
+            'publishDate',
+            'industryCode',
+            'industryName',
+            'researcher',
+            'summary',
+            'sourceUrl',
+            'downloadUrl',
+            'market'
+        ]
+    ]
+    return big_df
+
+
 if __name__ == "__main__":
-    stock_zh_a_spot_em_df = stock_zh_a_spot_em()
-    print(stock_zh_a_spot_em_df)
+    df = stock_em_hgyb(start_date="2022-01-21", end_date="2022-01-21")
+    print(df)

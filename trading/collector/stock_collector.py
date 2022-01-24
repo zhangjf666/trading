@@ -6,6 +6,7 @@ Desc: 股票数据获取
 
 from logging import log
 import traceback
+from unicodedata import name
 import pandas as pd
 import os
 import akshare as ak
@@ -17,6 +18,12 @@ import trading.api.sina as sina
 import trading.api.common as api
 from trading.config.logger import logger
 import trading.util.common_util as util
+from sqlalchemy import create_engine
+
+
+# 1. 用sqlalchemy构建数据库链接engine
+connect_info = 'mysql+pymysql://{}:{}@{}:{}/{}?charset=utf8'.format("zjf", "39518605", "192.168.2.184", "3306", "trading")
+engine = create_engine(connect_info)
 
 
 def to_sina_code(code):
@@ -776,7 +783,46 @@ def update_hyzj_daily(symbol: str = "5日排行"):
         logger.error('更新行业资金' + symbol + '排行出错:' + traceback.format_exc())
 
 
+# 每日研报采集
+def update_yjbg():
+    """
+    每日研报采集
+    """
+    # 获取连接
+    connect = engine.connect()
+    try:
+        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        # 个股研报
+        df = em.stock_em_ggyb(start_date=dateStr)
+        df.drop(columns=['industryCode', 'industryName'], inplace=True)
+        df.rename(columns={'indvInduCode': 'industryCode', 'indvInduName': 'industryName', 'attachPages': 'page'}, inplace=True)
+        df['category'] = '1'
+        # 行业研报
+        temp = em.stock_em_hyyb(start_date=dateStr)
+        temp.drop(columns=['indvInduCode', 'indvInduName'], inplace=True)
+        temp.rename(columns={'attachPages': 'page'}, inplace=True)
+        temp['category'] = '2'
+        df = df.append(temp)
+        # 策略研报
+        temp = em.stock_em_clyb(start_date=dateStr)
+        temp['category'] = '3'
+        df = df.append(temp)
+        # 宏观研报
+        temp = em.stock_em_hgyb(start_date=dateStr)
+        temp['category'] = '4'
+        df = df.append(temp)
+        # 列名驼峰转下划线
+        df.columns = [util.camel_to_underline(name) for name in df.columns]
+        df.to_sql(name='research_report', con=connect, if_exists='append', index=False)
+        logger.info(dateStr + '研报更新结束.')
+    except BaseException:
+        logger.error(dateStr + '研报更新出错:' + traceback.format_exc())
+    finally:
+        connect.close()
+
+
 if __name__ == '__main__':
+    update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()
@@ -791,12 +837,12 @@ if __name__ == '__main__':
     # update_ggzj_daily(symbol='5日排行')
     # update_ggzj_daily(symbol='10日排行')
     # update_ggzj_daily(symbol='20日排行')
-    update_gnzj_daily(symbol='当日排行')
+    # update_gnzj_daily(symbol='当日排行')
     # update_gnzj_daily(symbol='3日排行')
     # update_gnzj_daily(symbol='5日排行')
     # update_gnzj_daily(symbol='10日排行')
     # update_gnzj_daily(symbol='20日排行')
-    update_hyzj_daily(symbol='当日排行')
+    # update_hyzj_daily(symbol='当日排行')
     # update_hyzj_daily(symbol='3日排行')
     # update_hyzj_daily(symbol='5日排行')
     # update_hyzj_daily(symbol='10日排行')
