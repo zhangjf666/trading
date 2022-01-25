@@ -784,14 +784,14 @@ def update_yjbg(dateStr: str = None):
     每日研报采集,因为当天的研报一直在实时更新,每日采集一次的话,必须将昨天的研报一起采集,不然会采集不全
     :param dateStr: '2022-01-01'
     """
-    # 获取连接
+    if not dateStr:
+        dateStr = (datetime.datetime.today() + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
     logger.info(dateStr + '研报采集开始.')
+    # 获取连接
     connect = Db().get_connect()
     try:
-        if not dateStr:
-            dateStr = (datetime.datetime.today() + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
         # 删除查询日期的数据,重新采集
-        connect.execute("delete from trading.research_report rr  where rr.publish_date >= '{}'".format(dateStr))
+        connect.execute("delete from research_report where publish_date >= '{}'".format(dateStr))
         # 个股研报
         df = em.stock_em_ggyb(start_date=dateStr)
         df.drop(columns=['industryCode', 'industryName'], inplace=True)
@@ -823,7 +823,7 @@ def update_yjbg(dateStr: str = None):
 
 
 if __name__ == '__main__':
-    update_yjbg()
+    # update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()
@@ -833,18 +833,18 @@ if __name__ == '__main__':
     # update_cxsl_daily()
     # update_ljqs_daily()
     # update_ljqd_daily()
-    # update_ggzj_daily(symbol='当日排行')
-    # update_ggzj_daily(symbol='3日排行')
-    # update_ggzj_daily(symbol='5日排行')
-    # update_ggzj_daily(symbol='10日排行')
-    # update_ggzj_daily(symbol='20日排行')
-    # update_gnzj_daily(symbol='当日排行')
-    # update_gnzj_daily(symbol='3日排行')
-    # update_gnzj_daily(symbol='5日排行')
-    # update_gnzj_daily(symbol='10日排行')
-    # update_gnzj_daily(symbol='20日排行')
-    # update_hyzj_daily(symbol='当日排行')
-    # update_hyzj_daily(symbol='3日排行')
-    # update_hyzj_daily(symbol='5日排行')
-    # update_hyzj_daily(symbol='10日排行')
-    # update_hyzj_daily(symbol='20日排行')
+    update_ggzj_daily(symbol='当日排行')
+    update_ggzj_daily(symbol='3日排行')
+    update_ggzj_daily(symbol='5日排行')
+    update_ggzj_daily(symbol='10日排行')
+    update_ggzj_daily(symbol='20日排行')
+    update_gnzj_daily(symbol='当日排行')
+    update_gnzj_daily(symbol='3日排行')
+    update_gnzj_daily(symbol='5日排行')
+    update_gnzj_daily(symbol='10日排行')
+    update_gnzj_daily(symbol='20日排行')
+    update_hyzj_daily(symbol='当日排行')
+    update_hyzj_daily(symbol='3日排行')
+    update_hyzj_daily(symbol='5日排行')
+    update_hyzj_daily(symbol='10日排行')
+    update_hyzj_daily(symbol='20日排行')
