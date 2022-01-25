@@ -1,22 +1,76 @@
-# -*- coding:utf-8 -*-
 """
 Date: 2021-01-14 22:00:56
-Desc: 创建数据库表
+Desc: 数据库操作
 """
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import Integer, String, Text, Date, DateTime, ForeignKey, UniqueConstraint, Index
-
+from trading.config.logger import logger
+import functools
 
 Base = declarative_base()
+
+# 以字典的形式配置好Mysql数据库的连接信息
+mysql_dic = {
+    'mysql_user': 'zjf',
+    'mysql_pass': '39518605',
+    'mysql_ip': '192.168.2.184',
+    'mysql_port': 3306,
+    'mysql_db': 'trading',
+}
+
+
+class Db(object):  # 创建一个专门连接数据库的类
+    __instance = None
+    __engine = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = object.__new__(cls)
+        return cls.__instance
+
+    def gen_engine(self):
+        if not Db.__engine:
+            logger.info("初始化数据库引擎开始")
+            mysql_str = "mysql+pymysql://{mysql_user}:{mysql_pass}@{mysql_ip}:{mysql_port}/{mysql_db}"  # 连接数据库的命令行
+            mysql_con = mysql_str.format(**mysql_dic)  # 格式化命令
+            engine = create_engine(mysql_con, max_overflow=5)  # 初始化数据库连接
+            Db.__engine = engine
+            logger.info("初始化数据库引擎成功")
+        return Db.__engine
+
+    def create_table(self):
+        '''寻找Base的所有子类，按照子类的结构在数据库中生成对应的数据表信息'''
+        self.gen_engine()
+        Base.metadata.create_all(Db.__engine)
+
+    @property
+    def session(self):
+        self.gen_engine()
+        session = sessionmaker(bind=Db.__engine)
+        return session()
+
+    def get_connect(self):
+        '''获取一个原生连接,需要手动关闭'''
+        self.gen_engine()
+        return Db.__engine.connect()
+
+
+# 定义一个装饰器,包装其他调用自动获取session
+def session_wrap(method):
+    @functools.wraps(method)
+    def wrapper(*args, **kwargs):
+        session = Db().session
+        return method(*args, session, **kwargs)
+    return wrapper
 
 
 class ResearchReport(Base):
     __tablename__ = 'research_report'
     id = Column(Integer, primary_key=True, comment='自增id')
-    encode_url = Column(String(1000), nullable=False, comment='编码后url')
     title = Column(String(1000), index=True, nullable=False, comment='标题')
     stock_name = Column(String(100), index=True, comment='股票名称')
     stock_code = Column(String(10), index=True, comment='股票代码')
@@ -42,10 +96,3 @@ class ResearchReport(Base):
     predict_next_two_year_pe = Column(String(100), comment='预测后二年pe')
     market = Column(String(50), comment='市场')
     category = Column(String(1), index=True, nullable=False, comment='研报分类(1:个股研报,2:行业研报,3:策略研报,4:宏观研报)')
-
-
-# 1. 用sqlalchemy构建数据库链接engine
-connect_info = 'mysql+pymysql://{}:{}@{}:{}/{}?charset=utf8'.format("zjf", "39518605", "192.168.2.184", "3306", "trading")
-engine = create_engine(connect_info)
-# 2. 创建表
-Base.metadata.create_all(engine)

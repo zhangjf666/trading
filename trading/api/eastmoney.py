@@ -334,8 +334,9 @@ def stock_em_ggyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
     total_page = temp_df['TotalPage']
     big_df = pd.DataFrame()
     for page in tqdm(range(1, total_page+1), leave=False):
-        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        params.update({"pageNo": page, "pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
         r = requests.get(url, params=params)
+        data_text = r.text
         try:
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
@@ -363,6 +364,7 @@ def stock_em_ggyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
         _sleep()
     big_df = big_df[
         [
+            'encodeUrl',
             'title',
             'attachPages',
             'count',
@@ -436,8 +438,9 @@ def stock_em_hyyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
     total_page = temp_df['TotalPage']
     big_df = pd.DataFrame()
     for page in tqdm(range(1, total_page+1), leave=False):
-        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        params.update({"pageNo": page, "pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
         r = requests.get(url, params=params)
+        data_text = r.text
         try:
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
@@ -465,6 +468,7 @@ def stock_em_hyyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
         _sleep()
     big_df = big_df[
         [
+            'encodeUrl',
             'title',
             'attachPages',
             'count',
@@ -534,8 +538,9 @@ def stock_em_clyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
     total_page = temp_df['TotalPage']
     big_df = pd.DataFrame()
     for page in tqdm(range(1, total_page+1), leave=False):
-        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        params.update({"pageNo": page, "pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
         r = requests.get(url, params=params)
+        data_text = r.text
         try:
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
@@ -563,6 +568,7 @@ def stock_em_clyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
         _sleep()
     big_df = big_df[
         [
+            'encodeUrl',
             'title',
             'count',
             'orgCode',
@@ -619,8 +625,9 @@ def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
     total_page = temp_df['TotalPage']
     big_df = pd.DataFrame()
     for page in tqdm(range(1, total_page+1), leave=False):
-        params.update({"pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
+        params.update({"pageNo": page, "pageNumber": page, "p": page, "pageNum": page, "pageNumber": page})
         r = requests.get(url, params=params)
+        data_text = r.text
         try:
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
@@ -648,6 +655,7 @@ def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
         _sleep()
     big_df = big_df[
         [
+            'encodeUrl',
             'title',
             'count',
             'orgCode',
@@ -667,5 +675,5 @@ def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
 
 
 if __name__ == "__main__":
-    df = stock_em_hgyb(start_date="2022-01-21", end_date="2022-01-21")
+    df = stock_em_hgyb(start_date="2022-01-24", end_date="2022-01-24")
     print(df)

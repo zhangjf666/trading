@@ -18,12 +18,7 @@ import trading.api.sina as sina
 import trading.api.common as api
 from trading.config.logger import logger
 import trading.util.common_util as util
-from sqlalchemy import create_engine
-
-
-# 1. 用sqlalchemy构建数据库链接engine
-connect_info = 'mysql+pymysql://{}:{}@{}:{}/{}?charset=utf8'.format("zjf", "39518605", "192.168.2.184", "3306", "trading")
-engine = create_engine(connect_info)
+from trading.config.database import Db
 
 
 def to_sina_code(code):
@@ -784,14 +779,19 @@ def update_hyzj_daily(symbol: str = "5日排行"):
 
 
 # 每日研报采集
-def update_yjbg():
+def update_yjbg(dateStr: str = None):
     """
-    每日研报采集
+    每日研报采集,因为当天的研报一直在实时更新,每日采集一次的话,必须将昨天的研报一起采集,不然会采集不全
+    :param dateStr: '2022-01-01'
     """
     # 获取连接
-    connect = engine.connect()
+    logger.info(dateStr + '研报采集开始.')
+    connect = Db().get_connect()
     try:
-        dateStr = datetime.datetime.today().strftime('%Y-%m-%d')
+        if not dateStr:
+            dateStr = (datetime.datetime.today() + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
+        # 删除查询日期的数据,重新采集
+        connect.execute("delete from trading.research_report rr  where rr.publish_date >= '{}'".format(dateStr))
         # 个股研报
         df = em.stock_em_ggyb(start_date=dateStr)
         df.drop(columns=['industryCode', 'industryName'], inplace=True)
@@ -813,10 +813,11 @@ def update_yjbg():
         df = df.append(temp)
         # 列名驼峰转下划线
         df.columns = [util.camel_to_underline(name) for name in df.columns]
+        df.drop_duplicates(inplace=True)
         df.to_sql(name='research_report', con=connect, if_exists='append', index=False)
-        logger.info(dateStr + '研报更新结束.')
+        logger.info(dateStr + '研报采集结束.共更新研报' + str(len(df)) + '条')
     except BaseException:
-        logger.error(dateStr + '研报更新出错:' + traceback.format_exc())
+        logger.error(dateStr + '研报采集出错:' + traceback.format_exc())
     finally:
         connect.close()
 

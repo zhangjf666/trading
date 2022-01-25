@@ -12,8 +12,8 @@ from trading.strategy import ma_higher, oversoldNewStock
 scheduler = BlockingScheduler()
 
 
-# 日频任务
-def daily_task():
+# 交易日任务
+def tradeday_task():
     # 更新交易日信息
     sc.save_tradeday()
     if not sc.is_trade_date(datetime.datetime.today().strftime('%Y-%m-%d')):
@@ -46,8 +46,6 @@ def daily_task():
     sc.update_index()
     sc.update_index_daily()
 
-    # 机构调研
-    sc.update_jgdy_tj()
     # 技术指标
     sc.update_cxg_daily()
     sc.update_cxd_daily()
@@ -75,6 +73,14 @@ def daily_task():
     sc.update_hyzj_daily(symbol='20日排行')
 
 
+# 日频任务
+def daily_task():
+    # 机构调研
+    sc.update_jgdy_tj()
+    # 研究报告
+    sc.update_yjbg()
+
+
 # 周频任务
 def weekly_task():
     # 板块相关
@@ -90,6 +96,7 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     nexttime = now + datetime.timedelta(minutes=1)
     # 日频任务
+    scheduler.add_job(tradeday_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     scheduler.add_job(daily_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
     # 周频任务
     scheduler.add_job(weekly_task, 'cron', day_of_week='mon', hour=20, minute=0)
