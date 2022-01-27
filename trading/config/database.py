@@ -22,6 +22,9 @@ mysql_dic = {
     'mysql_db': 'trading',
 }
 
+# 连接数据库的命令行
+db_str = "mysql+pymysql://{mysql_user}:{mysql_pass}@{mysql_ip}:{mysql_port}/{mysql_db}".format(**mysql_dic)
+
 
 class Db(object):  # 创建一个专门连接数据库的类
     __instance = None
@@ -35,9 +38,7 @@ class Db(object):  # 创建一个专门连接数据库的类
     def gen_engine(self):
         if not Db.__engine:
             logger.info("初始化数据库引擎开始")
-            mysql_str = "mysql+pymysql://{mysql_user}:{mysql_pass}@{mysql_ip}:{mysql_port}/{mysql_db}"  # 连接数据库的命令行
-            mysql_con = mysql_str.format(**mysql_dic)  # 格式化命令
-            engine = create_engine(mysql_con, max_overflow=5)  # 初始化数据库连接
+            engine = create_engine(db_str, max_overflow=5)  # 初始化数据库连接
             Db.__engine = engine
             logger.info("初始化数据库引擎成功")
         return Db.__engine

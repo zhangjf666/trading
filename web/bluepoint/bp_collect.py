@@ -12,6 +12,7 @@ from api_route import route
 import pandas as pd
 import trading.collector.constant as cons
 import trading.util.common_util as cutil
+import models
 
 collect = Blueprint('collect', __name__, url_prefix='/collect')
 
@@ -176,3 +177,10 @@ def zjlx(query: ZjlxQuery):
         raise APIException(400, '不支持的资金流向类型')
     df = pd.read_csv(os.path.join(cons.zjlx_path, file_name), dtype={'代码': str})
     return cutil.to_json(df)
+
+
+@route(collect, '/yjbg')
+def yjbg():
+    res = models.ResearchReport.query.filter_by(publish_date='2022-01-27').all()
+    print(res[5].title)
+    return res

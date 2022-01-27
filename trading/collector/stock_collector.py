@@ -153,7 +153,7 @@ def update_k_data_daliy():
     df = df[df['最新价'].notna()]
     df = df[['代码', '名称', '今开', '最新价', '最高', '最低', '成交量', '成交额', '振幅', '涨跌幅', '涨跌额', '换手率', '总市值', '流通市值', '市盈率-动态', '市净率', '量比']]
     df.rename(columns={'今开': '开盘', '最新价': '收盘'}, inplace=True)
-    df.insert(1, '日期', today.strftime('%Y-%m-%d'))
+    df.insert(1, '日期', dateStr)
     logger.info('更新每日股票数据开始.')
     for index in df.index:
         row = df.loc[index, :]
@@ -779,18 +779,22 @@ def update_hyzj_daily(symbol: str = "5日排行"):
 
 
 # 每日研报采集
-def update_yjbg(dateStr: str = None):
+def update_yjbg():
     """
     每日研报采集,因为当天的研报一直在实时更新,每日采集一次的话,必须将昨天的研报一起采集,不然会采集不全
     :param dateStr: '2022-01-01'
     """
-    if not dateStr:
-        dateStr = (datetime.datetime.today() + datetime.timedelta(days=-1)).strftime('%Y-%m-%d')
-    logger.info(dateStr + '研报采集开始.')
+    logger.info(datetime.datetime.today().strftime('%Y-%m-%d') + '研报采集开始.')
     # 获取连接
     connect = Db().get_connect()
     try:
         # 删除查询日期的数据,重新采集
+        last_date = connect.execute("SELECT MAX(publish_date) from trading.research_report").first()
+        if len(last_date.items()) > 0:
+            date = last_date.items()[0][1]
+        else:
+            date = datetime.datetime.today() + datetime.timedelta(days=-1)
+        dateStr = date.strftime('%Y-%m-%d')
         connect.execute("delete from research_report where publish_date >= '{}'".format(dateStr))
         # 个股研报
         df = em.stock_em_ggyb(start_date=dateStr)
@@ -823,7 +827,7 @@ def update_yjbg(dateStr: str = None):
 
 
 if __name__ == '__main__':
-    # update_yjbg()
+    update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()
@@ -833,18 +837,18 @@ if __name__ == '__main__':
     # update_cxsl_daily()
     # update_ljqs_daily()
     # update_ljqd_daily()
-    update_ggzj_daily(symbol='当日排行')
-    update_ggzj_daily(symbol='3日排行')
-    update_ggzj_daily(symbol='5日排行')
-    update_ggzj_daily(symbol='10日排行')
-    update_ggzj_daily(symbol='20日排行')
-    update_gnzj_daily(symbol='当日排行')
-    update_gnzj_daily(symbol='3日排行')
-    update_gnzj_daily(symbol='5日排行')
-    update_gnzj_daily(symbol='10日排行')
-    update_gnzj_daily(symbol='20日排行')
-    update_hyzj_daily(symbol='当日排行')
-    update_hyzj_daily(symbol='3日排行')
-    update_hyzj_daily(symbol='5日排行')
-    update_hyzj_daily(symbol='10日排行')
-    update_hyzj_daily(symbol='20日排行')
+    # update_ggzj_daily(symbol='当日排行')
+    # update_ggzj_daily(symbol='3日排行')
+    # update_ggzj_daily(symbol='5日排行')
+    # update_ggzj_daily(symbol='10日排行')
+    # update_ggzj_daily(symbol='20日排行')
+    # update_gnzj_daily(symbol='当日排行')
+    # update_gnzj_daily(symbol='3日排行')
+    # update_gnzj_daily(symbol='5日排行')
+    # update_gnzj_daily(symbol='10日排行')
+    # update_gnzj_daily(symbol='20日排行')
+    # update_hyzj_daily(symbol='当日排行')
+    # update_hyzj_daily(symbol='3日排行')
+    # update_hyzj_daily(symbol='5日排行')
+    # update_hyzj_daily(symbol='10日排行')
+    # update_hyzj_daily(symbol='20日排行')
