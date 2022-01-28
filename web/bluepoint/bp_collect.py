@@ -5,14 +5,19 @@ Desc: 采集路由
 """
 import os
 import json
+from unicodedata import category
 from flask import Blueprint
 from pydantic import BaseModel
+from sqlalchemy import and_, or_
 from web.api_exception import APIException
 from api_route import route
 import pandas as pd
 import trading.collector.constant as cons
 import trading.util.common_util as cutil
-import models
+import models as Models
+from ext import db
+import web_util as wutil
+from sqlalchemy.dialects import mysql
 
 collect = Blueprint('collect', __name__, url_prefix='/collect')
 
@@ -39,8 +44,10 @@ class ConvertibleRequest(BaseModel):
 @route(collect, '/convertible')
 def convertible(query: ConvertibleRequest):
     result = pd.read_csv(cons.convertible_file)
-    result = result[(result['双低值'] >= query.miniDoubleValue) & (result['双低值'] <= query.maxDoubleValue)]
-    result = result[(result['转债最新价'] >= query.miniBondPrice) & (result['转债最新价'] <= query.maxBondPrice)]
+    result = result[(result['双低值'] >= query.miniDoubleValue)
+                    & (result['双低值'] <= query.maxDoubleValue)]
+    result = result[(result['转债最新价'] >= query.miniBondPrice)
+                    & (result['转债最新价'] <= query.maxBondPrice)]
     result.sort_values(by=['双低值'], ascending=[True], inplace=True)
     return cutil.to_json(result)
 
@@ -175,12 +182,65 @@ def zjlx(query: ZjlxQuery):
             raise APIException(400, '不支持的资金流向类型')
     else:
         raise APIException(400, '不支持的资金流向类型')
-    df = pd.read_csv(os.path.join(cons.zjlx_path, file_name), dtype={'代码': str})
+    df = pd.read_csv(os.path.join(cons.zjlx_path, file_name),
+                     dtype={'代码': str})
     return cutil.to_json(df)
 
 
+class YjbgQuery(BaseModel):
+    context: str = None
+    stockName: str = None
+    stockCode: str = None
+    researcher: str = None
+    orgName: str = None
+    industryName: str = None
+    minPage: int = 1
+    beginDate: str = None
+    endDate: str = None
+    category: str = '0'
+    page: int = 1
+    perPage: int = 10
+
+
 @route(collect, '/yjbg')
-def yjbg():
-    res = models.ResearchReport.query.filter_by(publish_date='2022-01-27').all()
-    print(res[5].title)
+def yjbg(query: YjbgQuery):
+    session = db.session.query(Models.ResearchReport)
+    # 查询条件组合
+    search = or_
+    if query.context:
+        word = query.context.split()
+        for key in word:
+            if key.isdigit():
+                search = or_(search, Models.ResearchReport.stock_code == key)
+            else:
+                search = or_(
+                    search,
+                    Models.ResearchReport.title.like('%{}%'.format(key)),
+                    Models.ResearchReport.stock_name.like('%{}%'.format(key)),
+                    Models.ResearchReport.industry_name.like('%{}%'.format(key)),
+                    Models.ResearchReport.researcher.like('%{}%'.format(key)))
+    if query.stockCode:
+        search = or_(search, Models.ResearchReport.stock_code == query.stockCode)
+    if query.stockName:
+        search = or_(search, Models.ResearchReport.stock_name.like('%{}%'.format(query.stockName)))
+    if query.researcher:
+        search = or_(search, Models.ResearchReport.researcher.like('%{}%'.format(query.researcher)))
+    if query.industryName:
+        search = or_(search, Models.ResearchReport.industry_name.like('%{}%'.format(query.industryName)))
+    if query.orgName:
+        search = or_(search, Models.ResearchReport.org_s_name.like('%{}%'.format(query.orgName)))
+    if query.beginDate:
+        search = and_(search, Models.ResearchReport.publish_date >= query.beginDate)
+    if query.endDate:
+        search = and_(search, Models.ResearchReport.publish_date <= query.endDate)
+    if query.minPage:
+        search = and_(search, Models.ResearchReport.page >= query.minPage)
+    if query.category != '0':
+        search = and_(search, Models.ResearchReport.category == query.category)
+    page = session.filter(search).order_by(
+        Models.ResearchReport.publish_date.desc()).paginate(query.page, query.perPage)
+    # print(str(session.statement.compile(dialect=mysql.dialect(),compile_kwargs={"literal_binds": True})))
+    res = wutil.page_to_dict(page)
+    rr_schema = Models.ResearchReportSchema(many=True)
+    res['items'] = rr_schema.dump(res['items'])
     return res

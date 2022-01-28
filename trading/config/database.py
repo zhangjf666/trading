@@ -38,7 +38,7 @@ class Db(object):  # 创建一个专门连接数据库的类
     def gen_engine(self):
         if not Db.__engine:
             logger.info("初始化数据库引擎开始")
-            engine = create_engine(db_str, max_overflow=5)  # 初始化数据库连接
+            engine = create_engine(db_str, connect_args={"characterEncoding": "utf8", "useSSL": "false", "allowPublicKeyRetrieval": "true"}, max_overflow=5)  # 初始化数据库连接
             Db.__engine = engine
             logger.info("初始化数据库引擎成功")
         return Db.__engine

@@ -5,6 +5,7 @@ Desc: 数据库模型
 """
 
 from ext import db
+from ext import ma
 
 
 class ResearchReport(db.Model):
@@ -35,3 +36,33 @@ class ResearchReport(db.Model):
     predict_next_two_year_pe = db.Column(db.String(100), comment='预测后二年pe')
     market = db.Column(db.String(50), comment='市场')
     category = db.Column(db.String(1), index=True, nullable=False, comment='研报分类(1:个股研报,2:行业研报,3:策略研报,4:宏观研报)')
+
+
+class ResearchReportSchema(ma.SQLAlchemySchema):
+    class Meta:
+        model = ResearchReport
+    id = ma.auto_field()
+    title = ma.auto_field()
+    stock_name = ma.auto_field()
+    stock_code = ma.auto_field()
+    page = ma.auto_field()
+    count = ma.auto_field()
+    publish_date = ma.auto_field()
+    researcher = ma.auto_field()
+    summary = ma.auto_field()
+    download_url = ma.auto_field()
+    org_code = ma.auto_field()
+    org_name = ma.auto_field()
+    org_s_name = ma.auto_field()
+    industry_code = ma.auto_field()
+    industry_name = ma.auto_field()
+    em_rating_name = ma.auto_field()
+    s_rating_name = ma.auto_field()
+    predict_this_year_eps = ma.auto_field()
+    predict_this_year_pe = ma.auto_field()
+    predict_next_year_eps = ma.auto_field()
+    predict_next_year_pe = ma.auto_field()
+    predict_next_two_year_eps = ma.auto_field()
+    predict_next_two_year_pe = ma.auto_field()
+    market = ma.auto_field()
+    category = ma.auto_field()
