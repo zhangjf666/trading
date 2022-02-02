@@ -194,10 +194,10 @@ class YjbgQuery(BaseModel):
     researcher: str = None
     orgName: str = None
     industryName: str = None
-    minPage: int = 1
+    minPage: str = None
     beginDate: str = None
     endDate: str = None
-    category: str = '0'
+    category: list = None
     page: int = 1
     perPage: int = 10
 
@@ -235,10 +235,10 @@ def yjbg(query: YjbgQuery):
         search = and_(search, Models.ResearchReport.publish_date <= query.endDate)
     if query.minPage:
         search = and_(search, Models.ResearchReport.page >= query.minPage)
-    if query.category != '0':
-        search = and_(search, Models.ResearchReport.category == query.category)
+    if query.category:
+        search = and_(search, Models.ResearchReport.category.in_(query.category))
     page = session.filter(search).order_by(
-        Models.ResearchReport.publish_date.desc()).paginate(query.page, query.perPage)
+        Models.ResearchReport.publish_date.desc(), Models.ResearchReport.category.asc()).paginate(query.page, query.perPage)
     # print(str(session.statement.compile(dialect=mysql.dialect(),compile_kwargs={"literal_binds": True})))
     res = wutil.page_to_dict(page)
     rr_schema = Models.ResearchReportSchema(many=True)
