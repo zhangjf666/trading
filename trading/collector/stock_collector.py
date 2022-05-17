@@ -147,13 +147,14 @@ def update_all_history_k_data(start_date='19800101', end_date='21211231', adjust
     end_date:结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
     adjust:复权类型，默认不复权,qfq:前复权,hfq:后复权
     """
+    logger.info('所有A股历史K线数据更新开始,更新区间:' + start_date + '-' + end_date)
     basic = pd.read_csv(cons.stock_basic_file, dtype={'代码': str})
     for index in basic.index:
         row = basic.loc[index, :]
         s_code = row['代码']
         name = row['名称']
         try:
-            update_history_k_data(s_code, name, start_date='20211022', end_date='20211022')
+            update_history_k_data(s_code, name, start_date, end_date)
             logger.info(str(s_code) + ':更新成功')
         except BaseException:
             logger.error(str(s_code) + ':更新失败,原因:' + traceback.format_exc())
@@ -207,9 +208,10 @@ def smart_update_k_data():
     # 后一个交易日比当日小,使用区间更新
     if next_trade < today:
         update_all_history_k_data(start_date=next_trade.strftime('%Y%m%d'), end_date=today.strftime('%Y%m%d'))
+        update_k_data_daliy()
     elif next_trade == today:
         update_k_data_daliy()
-    
+
 
 # 保存北向资金信息
 def save_n2s():
@@ -866,7 +868,7 @@ def update_yjbg():
 
 
 if __name__ == '__main__':
-    smart_update_k_data()
+    update_k_data_daliy()
     # update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
