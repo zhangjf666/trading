@@ -22,7 +22,7 @@ def tradeday_task():
     # 股票基本信息
     sc.save_stock_basic()
     # 当日K线
-    sc.update_k_data_daliy()
+    sc.smart_update_k_data()
     # 北向资金
     sc.save_n2s()
     # 可转债比价表

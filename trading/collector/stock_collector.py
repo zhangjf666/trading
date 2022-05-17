@@ -4,9 +4,7 @@ Date: 2021-01-14 22:00:56
 Desc: 股票数据获取
 """
 
-from logging import log
 import traceback
-from unicodedata import name
 import pandas as pd
 import os
 import akshare as ak
@@ -140,6 +138,28 @@ def update_history_k_data(code, name='', start_date='19800101', end_date='212112
         alldata.to_csv(os.path.join(cons.stock_history_path, code + ".csv"), encoding="utf-8", index=False)
 
 
+# 更新所有股票历史区间数据
+def update_all_history_k_data(start_date='19800101', end_date='21211231', adjust=""):
+    """
+    获取所有A股历史K线数据
+    入参
+    start_date:开始日期（包含），格式“YYYYMMDD”，为空时取19900101；
+    end_date:结束日期（包含），格式“YYYYMMDD”，为空时取最近一个交易日；
+    adjust:复权类型，默认不复权,qfq:前复权,hfq:后复权
+    """
+    basic = pd.read_csv(cons.stock_basic_file, dtype={'代码': str})
+    for index in basic.index:
+        row = basic.loc[index, :]
+        s_code = row['代码']
+        name = row['名称']
+        try:
+            update_history_k_data(s_code, name, start_date='20211022', end_date='20211022')
+            logger.info(str(s_code) + ':更新成功')
+        except BaseException:
+            logger.error(str(s_code) + ':更新失败,原因:' + traceback.format_exc())
+    logger.info('所有A股历史K线数据更新完成')
+
+
 # 每日更新股票数据
 def update_k_data_daliy():
     # 判断是否是交易日并且是开盘之后,开盘之前获取的是昨日的数据,会有问题
@@ -171,6 +191,25 @@ def update_k_data_daliy():
         logger.info(code + ':更新成功.')
     logger.info('更新每日股票数据结束.')
 
+
+# 自动判断更新K线
+def smart_update_k_data():
+    # 获取最后k线最后更新日期,暂时使用[000001,平安银行]的更新日期
+    file_name = os.path.join(cons.stock_history_path, "000001.csv")
+    data = pd.read_csv(file_name, dtype={'代码': str})
+    data.index = pd.DatetimeIndex(data['日期'])
+    data = data.sort_index()
+    last_update_date = data[-1:]['日期'].values[0]
+    # 比较最后更新日期的后一个交易日是不是当天来确定使用哪种更新方式
+    next_trade_day = next_trade_date(last_update_date, offset=1)
+    next_trade = datetime.datetime.strptime(next_trade_day, '%Y-%m-%d')
+    today = datetime.datetime.strptime(datetime.datetime.today().strftime('%Y-%m-%d'), '%Y-%m-%d')
+    # 后一个交易日比当日小,使用区间更新
+    if next_trade < today:
+        update_all_history_k_data(start_date=next_trade.strftime('%Y%m%d'), end_date=today.strftime('%Y%m%d'))
+    elif next_trade == today:
+        update_k_data_daliy()
+    
 
 # 保存北向资金信息
 def save_n2s():
@@ -827,7 +866,8 @@ def update_yjbg():
 
 
 if __name__ == '__main__':
-    update_yjbg()
+    smart_update_k_data()
+    # update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()
