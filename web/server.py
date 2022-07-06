@@ -25,4 +25,4 @@ app.register_blueprint(strategy)
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8100, debug=True)
+    app.run(host='0.0.0.0', port=8100, debug=False)

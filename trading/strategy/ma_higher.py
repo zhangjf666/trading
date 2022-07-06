@@ -55,11 +55,15 @@ def select_stock_ma(filterLowerDays=1, filterHigherDays=65535, marketValue=0):
                 break
         # 如果有多头趋势,加入保存列表
         if higherDays > 0:
+            # 计算从多头开始时的股价涨幅跟涨速
+            point_end = kdata.iloc[0]
+            point_begin = kdata[kdata['日期'] == higherBegin].iloc[0]
+            slope = calc.get_slope(point_begin['收盘'], point_end['收盘'], higherDays)
             stock = {
                         '日期': datetime.datetime.today().strftime('%Y-%m-%d'),
                         '代码': code, '名称': kdata.iloc[0]['名称'],
                         '总市值': kdata.iloc[0]['总市值'], '流通市值': kdata.iloc[0]['流通市值'],
-                        '起始时间': higherBegin, '持续天数': higherDays
+                        '起始时间': higherBegin, '持续天数': higherDays, '涨幅(%)': slope['range'], '涨速': slope['speed']
                     }
             stocks = stocks.append(stock, ignore_index=True)
     # 按持续天数排序
@@ -122,11 +126,15 @@ def select_board_index_ma(board='1', filterLowerDays=1, filterHigherDays=65535):
                 break
         # 如果有多头趋势,加入保存列表
         if higherDays > 0:
+            # 计算从多头开始时的股价涨幅跟涨速
+            point_end = data.iloc[0]
+            point_begin = data[data['日期'] == higherBegin].iloc[0]
+            slope = calc.get_slope(point_begin['收盘价'], point_end['收盘价'], higherDays)
             result = {
                         '日期': datetime.datetime.today().strftime('%Y-%m-%d'),
                         '代码': code, '名称': data.iloc[0]['名称'],
                         '成交量': data.iloc[0]['成交量'], '成交额': data.iloc[0]['成交额'],
-                        '起始时间': higherBegin, '持续天数': higherDays
+                        '起始时间': higherBegin, '持续天数': higherDays, '涨幅(%)': slope['range'], '涨速': slope['speed']
                     }
             results = results.append(result, ignore_index=True)
     # 按持续天数排序
@@ -139,5 +147,6 @@ def select_board_index_ma(board='1', filterLowerDays=1, filterHigherDays=65535):
 
 
 if __name__ == '__main__':
-    select_board_index_ma('1')
+    # select_stock_ma()
+    # select_board_index_ma('1')
     select_board_index_ma('2')

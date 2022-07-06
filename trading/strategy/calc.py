@@ -62,3 +62,10 @@ def df_ma(df, field='close', ma_list=[5, 10, 20]):
     df.sort_index(inplace=True)
     for ma in ma_list:
         df['ma_' + str(ma)] = df[field].rolling(ma).mean()
+
+
+# 计算某个日期区间涨幅和涨速
+def get_slope(price_a, price_b, days):
+    rise = (float(price_b) - float(price_a))/float(price_a)
+    speed = rise/days
+    return {'range': rise * 100, 'speed': speed * 100}

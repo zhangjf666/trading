@@ -53,6 +53,10 @@ class StockMaRequest(BaseModel):
     maxTrendDay: int = 65535
     miniMarketValue: int = 1
     maxMarketValue: int = 65535
+    miniRange: float = None
+    maxRange: float = None
+    miniSpeed: float = None
+    maxSpeed: float = None
     industrys: list = None
     concepts: list = None
     jszb: list = None
@@ -90,6 +94,14 @@ def stock_ma(query: StockMaRequest):
     result.sort_values(by=['持续天数', '流通市值'], ascending=[False, False], inplace=True)
     result = result[(result['持续天数'] >= query.miniTrendDay) & (result['持续天数'] <= query.maxTrendDay)]
     result = result[(result['流通市值'] >= query.miniMarketValue * 100000000) & (result['流通市值'] <= query.maxMarketValue * 100000000)]
+    if query.miniRange:
+        result = result[(result['涨幅(%)'] >= query.miniRange)]
+    if query.maxRange:
+        result = result[(result['涨幅(%)'] <= query.maxRange)]
+    if query.miniSpeed:
+        result = result[(result['涨速'] >= query.miniSpeed)]
+    if query.maxSpeed:
+        result = result[(result['涨速'] <= query.maxSpeed)]
     result['总市值'] = (result['总市值'].astype(float)/100000000).round(2)
     result['流通市值'] = (result['流通市值'].astype(float)/100000000).round(2)
     result.rename(columns={'总市值': '总市值(亿)', '流通市值': '流通市值(亿)'}, inplace=True)
@@ -100,6 +112,10 @@ class IndexMaRequest(BaseModel):
     boardType: str
     miniTrendDay: int = 1
     maxTrendDay: int = 65535
+    miniRange: float = None
+    maxRange: float = None
+    miniSpeed: float = None
+    maxSpeed: float = None
 
 
 @route(strategy, '/index-ma')
@@ -123,6 +139,14 @@ def IndexMa(query: IndexMaRequest):
         raise APIException(400, '不支持的板块类型')
     df = df[(df['持续天数'] >= query.miniTrendDay) & (df['持续天数'] <= query.maxTrendDay)]
     df.sort_values(by=['持续天数'], ascending=[False], inplace=True)
+    if query.miniRange:
+        df = df[(df['涨幅(%)'] >= query.miniRange)]
+    if query.maxRange:
+        df = df[(df['涨幅(%)'] <= query.maxRange)]
+    if query.miniSpeed:
+        df = df[(df['涨速'] >= query.miniSpeed)]
+    if query.maxSpeed:
+        df = df[(df['涨速'] <= query.maxSpeed)]
     df['成交量'] = (df['成交量'].astype(float)/100000000).round(2)
     df['成交额'] = (df['成交额'].astype(float)/100000000).round(2)
     df.rename(columns={'成交量': '成交量(亿)', '成交额': '成交额(亿)'}, inplace=True)
