@@ -820,7 +820,7 @@ def update_hyzj_daily(symbol: str = "5日排行"):
 
 
 # 每日研报采集
-def update_yjbg():
+def update_yjbg(start_date: str = "", end_date: str = "2052-12-31"):
     """
     每日研报采集,因为当天的研报一直在实时更新,每日采集一次的话,必须将昨天的研报一起采集,不然会采集不全
     :param dateStr: '2022-01-01'
@@ -829,36 +829,45 @@ def update_yjbg():
     # 获取连接
     connect = Db().get_connect()
     try:
-        # 删除查询日期的数据,重新采集
-        last_date = connect.execute("SELECT MAX(publish_date) from trading.research_report").first()
-        if len(last_date.items()) > 0:
-            date = last_date.items()[0][1]
+        # 如果指定了开始时间,就采集指定时间内的研报,否则按数据库最后发布日采集之后的研报数据
+        if len(start_date) != 0:
+            dateStr = start_date
         else:
-            date = datetime.datetime.today() + datetime.timedelta(days=-1)
-        dateStr = date.strftime('%Y-%m-%d')
-        connect.execute("delete from research_report where publish_date >= '{}'".format(dateStr))
+            # 删除查询日期的数据,重新采集
+            last_date = connect.execute("SELECT MAX(publish_date) from trading.research_report").first()
+            if len(last_date.items()) > 0:
+                date = last_date.items()[0][1]
+            else:
+                date = datetime.datetime.today() + datetime.timedelta(days=-1)
+            dateStr = date.strftime('%Y-%m-%d')
         # 个股研报
-        df = em.stock_em_ggyb(start_date=dateStr)
+        df = em.stock_em_ggyb(start_date=dateStr, end_date=end_date)
         df.drop(columns=['industryCode', 'industryName'], inplace=True)
         df.rename(columns={'indvInduCode': 'industryCode', 'indvInduName': 'industryName', 'attachPages': 'page'}, inplace=True)
         df['category'] = '1'
+        logger.info(dateStr + '更新个股研报' + str(len(df)) + '条')
         # 行业研报
-        temp = em.stock_em_hyyb(start_date=dateStr)
+        temp = em.stock_em_hyyb(start_date=dateStr, end_date=end_date)
         temp.drop(columns=['indvInduCode', 'indvInduName'], inplace=True)
         temp.rename(columns={'attachPages': 'page'}, inplace=True)
         temp['category'] = '2'
+        logger.info(dateStr + '更新行业研报' + str(len(temp)) + '条')
         df = df.append(temp)
         # 策略研报
-        temp = em.stock_em_clyb(start_date=dateStr)
+        temp = em.stock_em_clyb(start_date=dateStr, end_date=end_date)
         temp['category'] = '3'
+        logger.info(dateStr + '更新策略研报' + str(len(temp)) + '条')
         df = df.append(temp)
         # 宏观研报
-        temp = em.stock_em_hgyb(start_date=dateStr)
+        temp = em.stock_em_hgyb(start_date=dateStr, end_date=end_date)
         temp['category'] = '4'
+        logger.info(dateStr + '更新宏观研报' + str(len(temp)) + '条')
         df = df.append(temp)
         # 列名驼峰转下划线
         df.columns = [util.camel_to_underline(name) for name in df.columns]
         df.drop_duplicates(inplace=True)
+        # 删除多余的数据,重新插入
+        connect.execute("delete from research_report where publish_date >= '{}'".format(dateStr))
         df.to_sql(name='research_report', con=connect, if_exists='append', index=False)
         logger.info(dateStr + '研报采集结束.共更新研报' + str(len(df)) + '条')
     except BaseException:
@@ -868,8 +877,8 @@ def update_yjbg():
 
 
 if __name__ == '__main__':
-    update_k_data_daliy()
-    # update_yjbg()
+    # update_k_data_daliy()
+    update_yjbg(end_date="2022-08-31")
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()

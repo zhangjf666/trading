@@ -4,6 +4,8 @@
 Date: 2021/9/2 22:26
 Desc: 东方财富网-数据获取
 """
+from dataclasses import replace
+from operator import truediv
 import requests
 import pandas as pd
 import demjson
@@ -341,22 +343,25 @@ def stock_em_ggyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
             continue
-        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
-        temp_df = pd.DataFrame(temp_df['data'])
+        data_df = demjson.decode(data_text[data_text.find('{'):-1])
+        data_df = pd.DataFrame(data_df['data'])
         summary_list = []
         download_list = []
         source_list = []
-        for index in temp_df.index:
-            row = temp_df.iloc[index, :]
+        temp_df = pd.DataFrame()
+        for index in data_df.index:
+            row = data_df.iloc[index, :]
             encode_url = getattr(row, 'encodeUrl')
             source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
             r = requests.get(source_url)
             soup = BeautifulSoup(r.text, "lxml")
-            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
-            summary_list.append(summary)
-            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
-            download_list.append(download_url)
-            source_list.append(source_url)
+            if soup.find('div', attrs={'class': 'ctx-content'}):
+                temp_df = temp_df.append(row, ignore_index=True)
+                summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+                summary_list.append(summary)
+                download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+                download_list.append(download_url)
+                source_list.append(source_url)
         temp_df['summary'] = summary_list
         temp_df['downloadUrl'] = download_list
         temp_df['sourceUrl'] = source_list
@@ -445,22 +450,25 @@ def stock_em_hyyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
             continue
-        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
-        temp_df = pd.DataFrame(temp_df['data'])
+        data_df = demjson.decode(data_text[data_text.find('{'):-1])
+        data_df = pd.DataFrame(data_df['data'])
         summary_list = []
         download_list = []
         source_list = []
-        for index in temp_df.index:
-            row = temp_df.iloc[index, :]
+        temp_df = pd.DataFrame()
+        for index in data_df.index:
+            row = data_df.iloc[index, :]
             encode_url = getattr(row, 'encodeUrl')
             source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
             r = requests.get(source_url)
             soup = BeautifulSoup(r.text, "lxml")
-            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
-            summary_list.append(summary)
-            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
-            download_list.append(download_url)
-            source_list.append(source_url)
+            if soup.find('div', attrs={'class': 'ctx-content'}):
+                temp_df = temp_df.append(row, ignore_index=True)
+                summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+                summary_list.append(summary)
+                download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+                download_list.append(download_url)
+                source_list.append(source_url)
         temp_df['summary'] = summary_list
         temp_df['downloadUrl'] = download_list
         temp_df['sourceUrl'] = source_list
@@ -545,22 +553,25 @@ def stock_em_clyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
             continue
-        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
-        temp_df = pd.DataFrame(temp_df['data'])
+        data_df = demjson.decode(data_text[data_text.find('{'):-1])
+        data_df = pd.DataFrame(data_df['data'])
         summary_list = []
         download_list = []
         source_list = []
-        for index in temp_df.index:
-            row = temp_df.iloc[index, :]
+        temp_df = pd.DataFrame()
+        for index in data_df.index:
+            row = data_df.iloc[index, :]
             encode_url = getattr(row, 'encodeUrl')
             source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
             r = requests.get(source_url)
             soup = BeautifulSoup(r.text, "lxml")
-            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
-            summary_list.append(summary)
-            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
-            download_list.append(download_url)
-            source_list.append(source_url)
+            if soup.find('div', attrs={'class': 'ctx-content'}):
+                temp_df = temp_df.append(row, ignore_index=True)
+                summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+                summary_list.append(summary)
+                download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+                download_list.append(download_url)
+                source_list.append(source_url)
         temp_df['summary'] = summary_list
         temp_df['downloadUrl'] = download_list
         temp_df['sourceUrl'] = source_list
@@ -632,22 +643,25 @@ def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
             demjson.decode(data_text[data_text.find('{'):-1])
         except BaseException:
             continue
-        temp_df = demjson.decode(data_text[data_text.find('{'):-1])
-        temp_df = pd.DataFrame(temp_df['data'])
+        data_df = demjson.decode(data_text[data_text.find('{'):-1])
+        data_df = pd.DataFrame(data_df['data'])
         summary_list = []
         download_list = []
         source_list = []
-        for index in temp_df.index:
-            row = temp_df.iloc[index, :]
+        temp_df = pd.DataFrame()
+        for index in data_df.index:
+            row = data_df.iloc[index, :]
             encode_url = getattr(row, 'encodeUrl')
             source_url = "https://data.eastmoney.com/report/zw_macresearch.jshtml?encodeUrl=" + encode_url
             r = requests.get(source_url)
             soup = BeautifulSoup(r.text, "lxml")
-            summary = soup.find('div', attrs={'class': 'ctx-content'}).text
-            summary_list.append(summary)
-            download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
-            download_list.append(download_url)
-            source_list.append(source_url)
+            if soup.find('div', attrs={'class': 'ctx-content'}):
+                temp_df = temp_df.append(row, ignore_index=True)
+                summary = soup.find('div', attrs={'class': 'ctx-content'}).text
+                summary_list.append(summary)
+                download_url = soup.find('a', attrs={'class': 'pdf-link'})['href']
+                download_list.append(download_url)
+                source_list.append(source_url)
         temp_df['summary'] = summary_list
         temp_df['downloadUrl'] = download_list
         temp_df['sourceUrl'] = source_list
@@ -675,5 +689,5 @@ def stock_em_hgyb(start_date: str = "2022-01-01", end_date: str = "2052-12-31") 
 
 
 if __name__ == "__main__":
-    df = stock_em_hgyb(start_date="2022-01-24", end_date="2022-01-24")
+    df = stock_em_clyb(start_date="2022-04-06", end_date="2022-04-07")
     print(df)
