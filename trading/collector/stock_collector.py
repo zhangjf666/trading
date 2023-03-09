@@ -9,6 +9,7 @@ import pandas as pd
 import os
 import akshare as ak
 import datetime
+from sqlalchemy import text
 import trading.collector.constant as cons
 import trading.api.eastmoney as em
 import trading.api.ths as ths
@@ -834,9 +835,9 @@ def update_yjbg(start_date: str = "", end_date: str = "2052-12-31"):
             dateStr = start_date
         else:
             # 删除查询日期的数据,重新采集
-            last_date = connect.execute("SELECT MAX(publish_date) from trading.research_report").first()
-            if len(last_date.items()) > 0:
-                date = last_date.items()[0][1]
+            last_date = connect.execute(text("SELECT MAX(publish_date) from trading.research_report")).first()
+            if len(last_date) > 0:
+                date = last_date[0]
             else:
                 date = datetime.datetime.today() + datetime.timedelta(days=-1)
             dateStr = date.strftime('%Y-%m-%d')
@@ -867,7 +868,7 @@ def update_yjbg(start_date: str = "", end_date: str = "2052-12-31"):
         df.columns = [util.camel_to_underline(name) for name in df.columns]
         df.drop_duplicates(inplace=True)
         # 删除多余的数据,重新插入
-        connect.execute("delete from research_report where publish_date >= '{}'".format(dateStr))
+        connect.execute(text("delete from research_report where publish_date >= '{}'".format(dateStr)))
         df.to_sql(name='research_report', con=connect, if_exists='append', index=False)
         logger.info(dateStr + '研报采集结束.共更新研报' + str(len(df)) + '条')
     except BaseException:
@@ -878,7 +879,7 @@ def update_yjbg(start_date: str = "", end_date: str = "2052-12-31"):
 
 if __name__ == '__main__':
     # update_k_data_daliy()
-    update_yjbg(end_date="2022-08-31")
+    update_yjbg()
     # update_jgdy_tj()
     # update_cxg_daily()
     # update_cxd_daily()

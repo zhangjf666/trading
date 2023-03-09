@@ -17,7 +17,7 @@ Base = declarative_base()
 mysql_dic = {
     'mysql_user': 'zjf',
     'mysql_pass': '39518605',
-    'mysql_ip': '192.168.2.184',
+    'mysql_ip': '192.168.2.89',
     'mysql_port': 3306,
     'mysql_db': 'trading',
 }
