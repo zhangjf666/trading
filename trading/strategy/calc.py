@@ -63,6 +63,20 @@ def df_ma(df, field='close', ma_list=[5, 10, 20]):
     for ma in ma_list:
         df['ma_' + str(ma)] = df[field].rolling(ma).mean()
 
+# dataframe 计算布林带
+def df_bolling(df, field='close', std=2, ma=20):
+    """
+    df: dataframe数据
+    field: 需要计算的数据列
+    std: 标准差
+    ma: 计算标准差的均线
+    """
+    df.sort_index(inplace=True)
+    df['std'] = df[field].rolling(ma).std(ddof=0)
+    df['ma_' + str(ma)] = df[field].rolling(ma).mean()
+    df['upper_bound'] = df['ma'+str(ma)] + 2*df['std']
+    df['lower_bound'] = df['ma'+str(ma)] - 2*df['std']
+
 
 # 计算某个日期区间涨幅和涨速
 def get_slope(price_a, price_b, days):
