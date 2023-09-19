@@ -97,9 +97,9 @@ if __name__ == '__main__':
     nexttime = now + datetime.timedelta(minutes=1)
     # 日频任务
     scheduler.add_job(tradeday_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
-    scheduler.add_job(daily_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
-    # 周频任务
-    scheduler.add_job(weekly_task, 'cron', day_of_week='mon', hour=20, minute=0)
+    # scheduler.add_job(daily_task, 'cron', day_of_week='*', hour=nexttime.hour, minute=nexttime.minute)
+    # # 周频任务
+    # scheduler.add_job(weekly_task, 'cron', day_of_week='mon', hour=20, minute=0)
 
     try:
         # 开始调度

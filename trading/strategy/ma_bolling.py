@@ -23,7 +23,16 @@ pd.set_option('display.max_rows', None)
 
 
 # 个股回测
-def backtesting_ma_bolling(code, name='', beginTime=None, endTime=None):
+def backtesting_ma_bolling(code, name='', beginTime=None, endTime=None, tradeDirection=0):
+    """
+    根据均线排列和布林带回测策略
+    入参
+    code:股票代码，6位数字代码，此参数不可为空;
+    name:股票名称
+    beginTime:开始日期（包含），格式“%Y-%m-%d”；
+    endTime:结束日期（包含），格式“%Y-%m-%d”；
+    tradeDirection:交易方向,0:双向,1:只做多,2:只做空
+    """
     logger.info('[' + code + ']' + name + '回测开始')
     file_name = os.path.join(ccons.stock_history_path, code+".csv")
     exist = os.path.exists(file_name)
@@ -120,10 +129,10 @@ def backtesting_ma_bolling(code, name='', beginTime=None, endTime=None):
             ma1 = row[ma_column[0]]
             ma2 = row[ma_column[1]]
             ma3 = row[ma_column[2]]
-            if(ma1 < ma2 < ma3):
+            if (tradeDirection == 0 or tradeDirection == 2) and (ma1 < ma2 < ma3):
                 isLower = True
                 isHigher = False
-            if(ma1 > ma2 > ma3):
+            if (tradeDirection == 0 or tradeDirection == 1) and (ma1 > ma2 > ma3):
                 isHigher = True
                 isLower = False
             # 2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
@@ -163,7 +172,7 @@ def backtesting_ma_bolling(code, name='', beginTime=None, endTime=None):
                             currentPosition['direction'] = 'sell'
                             currentPosition['entryDate'] = row['日期']
                 if isHigher and isCrossing:
-                     # K线最高价比布林带低,意思是离开了布林带,放弃
+                    # K线最高价比布林带低,意思是离开了布林带,放弃
                     if row['最高'] < row['lower_bound']:
                         isCrossing = False
                         currentPosition['stop'] = 0
@@ -218,7 +227,7 @@ def backtesting_ma_bolling(code, name='', beginTime=None, endTime=None):
     return outResult
 
 
-def backtesting_all_stock(beginTime=None, endTime=None):
+def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
     summaryList = []
     for index in basic.index:
@@ -226,7 +235,7 @@ def backtesting_all_stock(beginTime=None, endTime=None):
         s_code = row['代码']
         name = row['名称']
         try:
-            out = backtesting_ma_bolling(s_code, name, beginTime, endTime)
+            out = backtesting_ma_bolling(s_code, name, beginTime, endTime, tradeDirection)
             if bool(out):
                 stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
                 logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
@@ -242,9 +251,10 @@ def backtesting_all_stock(beginTime=None, endTime=None):
 
 
 if __name__ == '__main__':
-    out = backtesting_ma_bolling('688671')
-    if bool(out):
-        stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
-        logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
-        # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
-        # logger.info(out['trade_list'])
+    backtesting_all_stock(tradeDirection=1)
+    # out = backtesting_ma_bolling('000001', tradeDirection=1)
+    # if bool(out):
+    #     stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
+    #     logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
+    #     # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
+    #     # logger.info(out['trade_list'])
