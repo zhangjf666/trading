@@ -74,8 +74,8 @@ def df_bolling(df, field='close', std=2, ma=20):
     df.sort_index(inplace=True)
     df['std'] = df[field].rolling(ma).std(ddof=0)
     df['ma_' + str(ma)] = df[field].rolling(ma).mean()
-    df['upper_bound'] = df['ma'+str(ma)] + 2*df['std']
-    df['lower_bound'] = df['ma'+str(ma)] - 2*df['std']
+    df['higher_bound'] = df['ma_'+str(ma)] + 2*df['std']
+    df['lower_bound'] = df['ma_'+str(ma)] - 2*df['std']
 
 
 # 计算某个日期区间涨幅和涨速
@@ -83,3 +83,18 @@ def get_slope(price_a, price_b, days):
     rise = (float(price_b) - float(price_a))/float(price_a)
     speed = rise/days
     return {'range': rise * 100, 'speed': speed * 100}
+
+def calc_field_value_times(data_pd, field, value):
+        """
+        计算连续数据出现的最大次数
+        :param data_pd: 要处理的pandas数据集
+        :param field: 要计算的字段
+        :param value: 值
+        :return:
+        """
+        # 判断值是否存在
+        if data_pd.query("%s == %s" % (field, value)).empty:
+            return 0
+
+        data_pd["subgroup"] = data_pd[field].ne(data_pd[field].shift()).cumsum()
+        return data_pd.groupby([field, "subgroup"]).apply(len)[value].max()
