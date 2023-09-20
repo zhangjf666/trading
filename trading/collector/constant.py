@@ -13,6 +13,7 @@ save_root_path = "/python/data/trading/data/"
 # 如果文件夹不存在,先创建
 fileUtil.createPath(save_root_path)
 
+# 股票文件夹
 stock_path = os.path.join(save_root_path, "stock")
 # 如果文件夹不存在,先创建
 fileUtil.createPath(stock_path)
@@ -154,3 +155,12 @@ ljqd_file = os.path.join(jszb_path, ljqd_file_name)
 # 资金流向文件夹
 zjlx_path = os.path.join(stock_path, "zjxl")
 fileUtil.createPath(zjlx_path)
+
+# 外汇文件夹
+forex_path = os.path.join(save_root_path, "forex")
+# 如果文件夹不存在,先创建
+fileUtil.createPath(forex_path)
+
+forex_history_path = os.path.join(forex_path, "history")
+# 如果文件夹不存在,先创建
+fileUtil.createPath(forex_history_path)

@@ -22,6 +22,10 @@ fileUtil.createPath(over_sold_new_stock_path)
 ma_higher_path = os.path.join(strategy_path, 'ma_higher')
 fileUtil.createPath(ma_higher_path)
 
+# 均线布林带策略回测 文件夹
+ma_bolling_path = os.path.join(strategy_path, 'ma_bolling')
+fileUtil.createPath(ma_bolling_path)
+
 # 股票均线多头文件名
 ma_higher_stock_file_name = "stock.csv"
 # 股票均线多头文件
