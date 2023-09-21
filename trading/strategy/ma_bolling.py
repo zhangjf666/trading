@@ -115,13 +115,10 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
         else:
             # 判断是否满足入场条件
             # 1.均线多头或者空头排列
-            ma1 = row[ma_column[0]]
-            ma2 = row[ma_column[1]]
-            ma3 = row[ma_column[2]]
-            if (tradeDirection == 0 or tradeDirection == 2) and (ma1 < ma2 < ma3):
+            if (tradeDirection == 0 or tradeDirection == 2) and calc.calc_ma_sequence(row, ma_list) == -1:
                 isLower = True
                 isHigher = False
-            if (tradeDirection == 0 or tradeDirection == 1) and (ma1 > ma2 > ma3):
+            if (tradeDirection == 0 or tradeDirection == 1) and calc.calc_ma_sequence(row, ma_list) == 1:
                 isHigher = True
                 isLower = False
             # 2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
@@ -222,10 +219,10 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
 # 保存策略数据
 def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None):
     if bool(out):
-        stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
+        stdout = '''代码:{}, 名称:{}, 总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(code, name, out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
         logger.info('[' + code + ']' + name + '统计结果:' + stdout)
-        logger.info('[' + code + ']' + name + '交易明细:')
-        logger.info(out['trade_list'])
+        # logger.info('[' + code + ']' + name + '交易明细:')
+        # logger.info(out['trade_list'])
         # 写入文件
         filename = code
         if beginTime is None:
@@ -243,7 +240,7 @@ def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None):
 
 
 # 单个外汇回测
-def backtesting_forex(code, cycle, beginTime=None, endTime=None, tradeDirection=0):
+def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeDirection=0):
     """
     外汇回测
     入参
@@ -269,8 +266,42 @@ def backtesting_forex(code, cycle, beginTime=None, endTime=None, tradeDirection=
     kdata['日期'] = pd.to_datetime(kdata['日期'])
     kdata = kdata.rename(columns={"<OPEN>":"开盘", "<HIGH>":"最高", "<LOW>":"最低", "<CLOSE>":"收盘"})
     out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
-    save_testing_data(out, filename, beginTime=beginTime, endTime=endTime)
+    save_testing_data(out, filename, name, beginTime=beginTime, endTime=endTime)
     logger.info('[' + filename + ']' + '回测结束')
+    out['code'] = filename
+    out['name'] = name
+    return out
+    
+
+
+# 所有外汇回测
+def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection=0):
+    basic = pd.read_csv(ccons.forex_basic_file, dtype={'代码': str})
+    summaryList = []
+    for index in basic.index:
+        row = basic.loc[index, :]
+        s_code = row['代码']
+        name = row['名称']
+        for cyc in cycle:
+            try:
+                out = backtesting_forex(s_code, cyc, name, beginTime, endTime, tradeDirection)
+                if bool(out):
+                    # stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
+                    # logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
+                    # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
+                    # logger.info(out['trade_list'])
+                    del out['trade_list']
+                    summaryList.append(out)
+            except BaseException:
+                logger.error(str(s_code) + ':回测失败,原因:' + traceback.format_exc())
+    summary = pd.DataFrame(summaryList)
+    summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
+    logger.info(summaryOut)
+    file = open(os.path.join(scons.ma_bolling_path, 'all_forex_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
+    file.write(summaryOut)
+    file.close()
+    summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
+
 
 # 单个股票回测
 def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirection=0):
@@ -287,9 +318,12 @@ def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirectio
     out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
     save_testing_data(out, code, name, beginTime=beginTime, endTime=endTime)
     logger.info('[' + code + ']' + name + '回测结束')
+    out['code'] = code
+    out['name'] = name
+    return out
 
 
-
+# 所有股票回测
 def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
     summaryList = []
@@ -300,8 +334,8 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
         try:
             out = backtesting_stock(s_code, name, beginTime, endTime, tradeDirection)
             if bool(out):
-                stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
-                logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
+                # stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
+                # logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
                 # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
                 # logger.info(out['trade_list'])
                 del out['trade_list']
@@ -311,9 +345,14 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
     summary = pd.DataFrame(summaryList)
     summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
     logger.info(summaryOut)
+    file = open(os.path.join(scons.ma_bolling_path, 'all_stock_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
+    file.write(summaryOut)
+    file.close()
+    summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_stock_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
 
 
 if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
-    backtesting_forex('GBPUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
+    # backtesting_forex('GBPUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
+    backtesting_all_forex(['D1'], beginTime='2020-01-01', endTime='2023-09-20')

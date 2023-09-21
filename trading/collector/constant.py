@@ -164,3 +164,7 @@ fileUtil.createPath(forex_path)
 forex_history_path = os.path.join(forex_path, "history")
 # 如果文件夹不存在,先创建
 fileUtil.createPath(forex_history_path)
+
+forex_basic_file_name = "forex_basic.csv"
+
+forex_basic_file = os.path.join(forex_path, forex_basic_file_name)

@@ -98,3 +98,21 @@ def calc_field_value_times(data_pd, field, value):
 
         data_pd["subgroup"] = data_pd[field].ne(data_pd[field].shift()).cumsum()
         return data_pd.groupby([field, "subgroup"]).apply(len)[value].max()
+
+
+# 判断是否均线多头,空头排列
+def calc_ma_sequence(row, ma_list=[]):
+    """
+    判断是否均线多头,空头排列,返回-1:空头排列,1:多头排列
+    入参
+    row:带有均线信息的行
+    ma_list:所使用的均线列表
+    """
+    ma_values = []
+    for ma in ma_list:
+        ma_values.append(row['ma_' + str(ma)])
+    if ma_values == sorted(ma_values):
+        return -1
+    elif ma_values == sorted(ma_values, reverse=True):
+        return 1
+    return 0
