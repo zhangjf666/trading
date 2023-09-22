@@ -112,7 +112,10 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                     isLower = False
                     trading_list.append(currentPosition)
                     currentPosition = {'holding': False}
-        else:
+        # 止损K可以作为信号K
+        if currentPosition['holding'] is False:
+        # 止损K不可以作为信号K
+        # else:
             # 判断是否满足入场条件
             # 1.均线多头或者空头排列
             if (tradeDirection == 0 or tradeDirection == 2) and calc.calc_ma_sequence(row, ma_list) == -1:
@@ -139,7 +142,10 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
             # 3.如果已经出现穿越,则看当前是否是收出了阳线(做多)或者阴线(做空),符合条件就进场
             # 进场条件为多头排列时,价格下穿布林带下轨后收出回到布林带中第一个阳线,空头排列时,价格上
             # 穿布林带上轨后收出回到布林带中第一个阴线
-            else:
+            # 信号K可以作为入场K
+            if isCrossed is True:
+            # 信号K不可以作为入场K
+            # else:
                 # 出现了穿过布林带,判断当前是否还是正在布林带上,如果在,更新止损价格,如果回到布林带上并收反向K线进场,如果完全偏离出布林带放弃这次
                 if isLower and isCrossing:
                     # K线最低价比布林带高,意思是离开了布林带,放弃
@@ -355,4 +361,4 @@ if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
     # backtesting_forex('GBPUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
-    backtesting_all_forex(['D1'], beginTime='2020-01-01', endTime='2023-09-20')
+    backtesting_all_forex(['H1'], beginTime='2007-01-01', endTime='2023-09-20')
