@@ -4,6 +4,8 @@ Date: 2021-01-14 22:00:56
 Desc: 公共计算方法
 """
 
+import talib
+import math
 import numpy as np
 import pandas as pd
 
@@ -63,6 +65,20 @@ def df_ma(df, field='close', ma_list=[5, 10, 20]):
     for ma in ma_list:
         df['ma_' + str(ma)] = df[field].rolling(ma).mean()
 
+
+# dataframe 计算EMA数据
+def df_ema(df, field='close', ma_list=[5, 10, 20]):
+    """
+    df: dataframe数据
+    field: 需要计算的数据列
+    ma_list: 需要的均线列表,默认 5,10,20日均线
+    """
+    # 按照时间顺序升序排列
+    df.sort_index(inplace=True)
+    for ma in ma_list:
+        df['ema_' + str(ma)] = talib.EMA(df[field], timeperiod=ma)
+
+
 # dataframe 计算布林带
 def df_bolling(df, field='close', std=2, ma=20):
     """
@@ -84,33 +100,38 @@ def get_slope(price_a, price_b, days):
     speed = rise/days
     return {'range': rise * 100, 'speed': speed * 100}
 
-def calc_field_value_times(data_pd, field, value):
-        """
-        计算连续数据出现的最大次数
-        :param data_pd: 要处理的pandas数据集
-        :param field: 要计算的字段
-        :param value: 值
-        :return:
-        """
-        # 判断值是否存在
-        if data_pd.query("%s == %s" % (field, value)).empty:
-            return 0
 
-        data_pd["subgroup"] = data_pd[field].ne(data_pd[field].shift()).cumsum()
-        return data_pd.groupby([field, "subgroup"]).apply(len)[value].max()
+# 计算连续数据出现的最大次数
+def calc_field_value_times(data_pd, field, value):
+    """
+    计算连续数据出现的最大次数
+    :param data_pd: 要处理的pandas数据集
+    :param field: 要计算的字段
+    :param value: 值
+    :return:
+    """
+    # 判断值是否存在
+    if data_pd.query("%s == %s" % (field, value)).empty:
+        return 0
+
+    data_pd["subgroup"] = data_pd[field].ne(data_pd[field].shift()).cumsum()
+    return data_pd.groupby([field, "subgroup"]).apply(len)[value].max()
 
 
 # 判断是否均线多头,空头排列
-def calc_ma_sequence(row, ma_list=[]):
+def calc_ma_sequence(row, ma_list=[], ma_type='ma'):
     """
     判断是否均线多头,空头排列,返回-1:空头排列,1:多头排列
     入参
     row:带有均线信息的行
+    ma_type:均线类型,ma:简单移动平均线,ema:指数平滑移动平均线
     ma_list:所使用的均线列表
     """
     ma_values = []
     for ma in ma_list:
-        ma_values.append(row['ma_' + str(ma)])
+        if math.isnan(row[ma_type + '_' + str(ma)]):
+            return 0
+        ma_values.append(row[ma_type + '_' + str(ma)])
     if ma_values == sorted(ma_values):
         return -1
     elif ma_values == sorted(ma_values, reverse=True):

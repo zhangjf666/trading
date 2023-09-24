@@ -35,7 +35,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
     """
     # 获取均线排列跟布林带数据
     kdata.index = pd.DatetimeIndex(kdata['日期'])
-    calc.df_ma(kdata, field='收盘', ma_list=ma_list)
+    calc.df_ema(kdata, field='收盘', ma_list=ma_list)
     calc.df_bolling(kdata, field='收盘')
     # 筛选时间范围
     if beginTime is not None:
@@ -118,10 +118,10 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
         # else:
             # 判断是否满足入场条件
             # 1.均线多头或者空头排列
-            if (tradeDirection == 0 or tradeDirection == 2) and calc.calc_ma_sequence(row, ma_list) == -1:
+            if (tradeDirection == 0 or tradeDirection == 2) and calc.calc_ma_sequence(row, ma_list, 'ema') == -1:
                 isLower = True
                 isHigher = False
-            if (tradeDirection == 0 or tradeDirection == 1) and calc.calc_ma_sequence(row, ma_list) == 1:
+            if (tradeDirection == 0 or tradeDirection == 1) and calc.calc_ma_sequence(row, ma_list, 'ema') == 1:
                 isHigher = True
                 isLower = False
             # 2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
@@ -277,7 +277,6 @@ def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeD
     out['code'] = filename
     out['name'] = name
     return out
-    
 
 
 # 所有外汇回测
@@ -360,5 +359,5 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
 if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
-    # backtesting_forex('GBPUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
-    backtesting_all_forex(['H1'], beginTime='2007-01-01', endTime='2023-09-20')
+    # backtesting_forex('EURUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
+    backtesting_all_forex(['H1', 'H4', 'D1'], beginTime='2022-01-01', endTime='2023-09-20')
