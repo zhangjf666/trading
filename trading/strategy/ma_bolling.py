@@ -118,11 +118,15 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
         # else:
             # 判断是否满足入场条件
             # 1.均线多头或者空头排列
-            if (tradeDirection == 0 or tradeDirection == 2) and calc.calc_ma_sequence(row, ma_list, 'ema') == -1:
+            maSequence = calc.calc_ma_sequence(row, ma_list, 'ema')
+            if (tradeDirection == 0 or tradeDirection == 2) and maSequence == -1:
                 isLower = True
                 isHigher = False
-            if (tradeDirection == 0 or tradeDirection == 1) and calc.calc_ma_sequence(row, ma_list, 'ema') == 1:
+            if (tradeDirection == 0 or tradeDirection == 1) and maSequence == 1:
                 isHigher = True
+                isLower = False
+            if maSequence == 0:
+                isHigher = False
                 isLower = False
             # 2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
             if isCrossed is False:
