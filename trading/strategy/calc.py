@@ -89,9 +89,9 @@ def df_bolling(df, field='close', std=2, ma=20):
     """
     df.sort_index(inplace=True)
     df['std'] = df[field].rolling(ma).std(ddof=0)
-    df['ma_' + str(ma)] = df[field].rolling(ma).mean()
-    df['higher_bound'] = df['ma_'+str(ma)] + 2*df['std']
-    df['lower_bound'] = df['ma_'+str(ma)] - 2*df['std']
+    df['mid_bound'] = df[field].rolling(ma).mean()
+    df['higher_bound'] = df['mid_bound'] + 2*df['std']
+    df['lower_bound'] = df['mid_bound'] - 2*df['std']
 
 
 # 计算某个日期区间涨幅和涨速

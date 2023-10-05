@@ -54,6 +54,9 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
     isCrossing = False
     # 是否发生了穿过布林带
     isCrossed = False
+    # 出现穿过布林带时的多头空头状态,1:多头,-1:空头
+    crossMaSequence = 0
+
     currentPosition = {'holding': False}
     for index in kdata.index:
         row = kdata.loc[index]
@@ -72,6 +75,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                     isCrossed = False
                     isHigher = False
                     isLower = False
+                    crossMaSequence = 0
                     trading_list.append(currentPosition)
                     currentPosition = {'holding': False}
                 # 止损
@@ -84,6 +88,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                     isCrossed = False
                     isHigher = False
                     isLower = False
+                    crossMaSequence = 0
                     trading_list.append(currentPosition)
                     currentPosition = {'holding': False}
             elif currentPosition['direction'] == 'sell':
@@ -98,6 +103,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                     isCrossed = False
                     isHigher = False
                     isLower = False
+                    crossMaSequence = 0
                     trading_list.append(currentPosition)
                     currentPosition = {'holding': False}
                 # 止损
@@ -110,6 +116,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                     isCrossed = False
                     isHigher = False
                     isLower = False
+                    crossMaSequence = 0
                     trading_list.append(currentPosition)
                     currentPosition = {'holding': False}
         # 止损K可以作为信号K
@@ -137,12 +144,14 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                         isCrossing = True
                         currentPosition['stop'] = row['最高']
                         isCrossed = True
+                        crossMaSequence = -1
                 if isHigher:
                     # 判断下穿布林带
                     if row['最低'] <= row['lower_bound'] <= row['最高']:
                         isCrossing = True
                         currentPosition['stop'] = row['最低']
                         isCrossed = True
+                        crossMaSequence = 1
             # 3.如果已经出现穿越,则看当前是否是收出了阳线(做多)或者阴线(做空),符合条件就进场
             # 进场条件为多头排列时,价格下穿布林带下轨后收出回到布林带中第一个阳线,空头排列时,价格上
             # 穿布林带上轨后收出回到布林带中第一个阴线
@@ -152,37 +161,65 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
             # else:
                 # 出现了穿过布林带,判断当前是否还是正在布林带上,如果在,更新止损价格,如果回到布林带上并收反向K线进场,如果完全偏离出布林带放弃这次
                 if isLower and isCrossing:
-                    # K线最低价比布林带高,意思是离开了布林带,放弃
-                    if row['最低'] > row['higher_bound']:
+                    # 如果多空头方向变了,则放弃
+                    if crossMaSequence != -1:
                         isCrossing = False
                         currentPosition['stop'] = 0
                         isCrossed = False
+                        crossMaSequence = 0
+                    # K线最低价比布林带高,意思是离开了布林带,放弃
+                    # if row['最低'] > row['higher_bound']:
+                    #     isCrossing = False
+                    #     currentPosition['stop'] = 0
+                    #     isCrossed = False
+                    #     crossMaSequence = 0
                     else:
                         # 只要收出阴线进场,阳线继续更新止损价
                         if row['开盘'] <= row['收盘']:
                             currentPosition['stop'] = max(row['最高'], currentPosition['stop'])
                         if row['开盘'] > row['收盘']:
-                            currentPosition['stop'] = max(row['最高'], currentPosition['stop'])
-                            currentPosition['holding'] = True
-                            currentPosition['entryPrice'] = row['收盘']
-                            currentPosition['direction'] = 'sell'
-                            currentPosition['entryDate'] = row['日期']
+                            # 如果收盘穿过了布林中轨,止损过大,放弃
+                            if row['收盘'] > row['mid_bound']:
+                                currentPosition['stop'] = max(row['最高'], currentPosition['stop'])
+                                currentPosition['holding'] = True
+                                currentPosition['entryPrice'] = row['收盘']
+                                currentPosition['direction'] = 'sell'
+                                currentPosition['entryDate'] = row['日期']
+                            else:
+                                isCrossing = False
+                                currentPosition['stop'] = 0
+                                isCrossed = False
+                                crossMaSequence = 0
                 if isHigher and isCrossing:
-                    # K线最高价比布林带低,意思是离开了布林带,放弃
-                    if row['最高'] < row['lower_bound']:
+                    # 如果多空头方向变了,则放弃
+                    if crossMaSequence != 1:
                         isCrossing = False
                         currentPosition['stop'] = 0
                         isCrossed = False
+                        crossMaSequence = 0
+                    # K线最高价比布林带低,意思是离开了布林带,放弃
+                    # if row['最高'] < row['lower_bound']:
+                    #     isCrossing = False
+                    #     currentPosition['stop'] = 0
+                    #     isCrossed = False
+                    #     crossMaSequence = 0
                     else:
                         # 只要收出阳线进场,阴线继续更新止损价
                         if row['开盘'] >= row['收盘']:
                             currentPosition['stop'] = min(row['最低'], currentPosition['stop'])
                         if row['开盘'] < row['收盘']:
-                            currentPosition['stop'] = min(row['最低'], currentPosition['stop'])
-                            currentPosition['holding'] = True
-                            currentPosition['entryPrice'] = row['收盘']
-                            currentPosition['direction'] = 'buy'
-                            currentPosition['entryDate'] = row['日期']
+                            # 如果收盘穿过了布林中轨,止损过大,放弃
+                            if row['收盘'] < row['mid_bound']:
+                                currentPosition['stop'] = min(row['最低'], currentPosition['stop'])
+                                currentPosition['holding'] = True
+                                currentPosition['entryPrice'] = row['收盘']
+                                currentPosition['direction'] = 'buy'
+                                currentPosition['entryDate'] = row['日期']
+                            else:
+                                isCrossing = False
+                                currentPosition['stop'] = 0
+                                isCrossed = False
+                                crossMaSequence = 0
     # 计算总的交易频率跟胜率
     outResult = {}
     if(len(trading_list) <= 0):
@@ -363,5 +400,5 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
 if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
-    # backtesting_forex('EURUSD','H1', beginTime='2022-01-01', endTime='2023-09-18')
-    backtesting_all_forex(['H1', 'H4', 'D1'], beginTime='2022-01-01', endTime='2023-09-20')
+    # backtesting_forex('EURUSD','H1', beginTime='2022-01-01', endTime='2023-09-20')
+    backtesting_all_forex(['H1'], beginTime='2022-01-01', endTime='2023-09-20')
