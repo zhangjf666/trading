@@ -1,0 +1,61 @@
+//+------------------------------------------------------------------+
+//|                                                         test.mq5 |
+//|                                  Copyright 2023, MetaQuotes Ltd. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2023, MetaQuotes Ltd."
+#property link      "https://www.mql5.com"
+#property version   "1.00"
+//+------------------------------------------------------------------+
+//| Script program start function                                    |
+//+------------------------------------------------------------------+
+#property script_show_inputs
+input double OpenPrice=2.000000; //开仓价格
+input double StopPrice=1.000000; //止损价格
+input double StopLimit=100.00; //固定止损金额
+
+//仓位计算脚本
+void OnStart()
+  {
+//---
+   double openPrice=NormalizeDouble(OpenPrice, Digits());
+   double stopPrice=NormalizeDouble(StopPrice, Digits());
+
+   double ContractSize=SymbolInfoDouble(_Symbol,SYMBOL_TRADE_CONTRACT_SIZE);
+   double SymbolPoint=SymbolInfoDouble(_Symbol,SYMBOL_POINT);
+
+//--- 计算仓位
+   double lot=0;
+//USD在后面的直盘:EURUSD
+   if(StringFind(_Symbol,"USD") > 0)
+     {
+      lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize),2);
+     }
+//USD在前面的直盘:USDJPY
+   else
+      if(StringFind(_Symbol,"USD") == 0)
+        {
+         lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize/openPrice),2);
+        }
+      //交叉盘:NZDJPY
+      else
+         if(StringFind(_Symbol,"USD") <= 0)
+           {
+            string symbol=StringSubstr(_Symbol,0,3)+"USD";
+            MqlTick tick;
+            SymbolInfoTick(symbol, tick);
+            double tickask=NormalizeDouble(tick.ask,SymbolInfoInteger(symbol,SYMBOL_DIGITS));
+            lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize*tickask/openPrice),2);
+           }
+//边界检查
+   double minvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN);
+   if(lot<minvol)
+      lot=minvol;
+
+   double maxvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MAX);
+   if(lot>maxvol)
+      lot=maxvol;
+//--- return trading volume
+   printf(StringFormat("%s_%s 开仓价位:%f,止损价位:%f,止损金额:%f,开仓手数:%f",_Symbol,StringSubstr(EnumToString(_Period),7),openPrice,stopPrice,StopLimit,lot));
+  }
+//+------------------------------------------------------------------+

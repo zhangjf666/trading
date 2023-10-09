@@ -76,6 +76,16 @@ double TradeSizeOptimized(void)
         {
          lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize/openPrice),2);
         }
+//交叉盘:NZDJPY
+   else
+      if(StringFind(_Symbol,"USD") <= 0)
+        {
+         string symbol=StringSubstr(_Symbol,0,3)+"USD";
+         MqlTick tick;
+         SymbolInfoTick(symbol, tick);
+         double tickask=NormalizeDouble(tick.ask,SymbolInfoInteger(symbol,SYMBOL_DIGITS));
+         lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize*tickask/openPrice),2);
+        }
 //边界检查
    double minvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN);
    if(lot<minvol)
