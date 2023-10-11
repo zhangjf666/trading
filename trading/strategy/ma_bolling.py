@@ -8,6 +8,10 @@ import os
 import traceback
 import pandas as pd
 from datetime import datetime
+from openpyxl import Workbook,load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.chart import Reference,ScatterChart  # Reference：图标所用信息
+from openpyxl.chart import Series
 import trading.collector.constant as ccons
 import trading.strategy.calc as calc
 import trading.strategy.constant as scons
@@ -56,6 +60,8 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
     isCrossed = False
     # 出现穿过布林带时的多头空头状态,1:多头,-1:空头
     crossMaSequence = 0
+    # 发生穿过布林带后,价格偏离过大(离开了布林带,是否能进场交易,0:不进场,1:进场)
+    crossDeviateTrade = 1
 
     currentPosition = {'holding': False}
     for index in kdata.index:
@@ -68,7 +74,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                 if row['最低'] <= row['higher_bound'] <= row['最高']:
                     currentPosition['outDate'] = row['日期']
                     currentPosition['outPrice'] = row['higher_bound']
-                    profitRatio = (currentPosition['outPrice'] - currentPosition['entryPrice']) / (currentPosition['entryPrice'] - currentPosition['stop'])
+                    profitRatio = round((currentPosition['outPrice'] - currentPosition['entryPrice']) / (currentPosition['entryPrice'] - currentPosition['stop']),2)
                     currentPosition['profitRatio'] = profitRatio
                     currentPosition['isWin'] = True
                     isCrossing = False
@@ -96,7 +102,7 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                 if row['最低'] <= row['lower_bound'] <= row['最高']:
                     currentPosition['outDate'] = row['日期']
                     currentPosition['outPrice'] = row['lower_bound']
-                    profitRatio = (currentPosition['entryPrice'] - currentPosition['outPrice']) / (currentPosition['stop'] - currentPosition['entryPrice'])
+                    profitRatio = round((currentPosition['entryPrice'] - currentPosition['outPrice']) / (currentPosition['stop'] - currentPosition['entryPrice']),2)
                     currentPosition['profitRatio'] = profitRatio
                     currentPosition['isWin'] = True
                     isCrossing = False
@@ -168,11 +174,11 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                         isCrossed = False
                         crossMaSequence = 0
                     # K线最低价比布林带高,意思是离开了布林带,放弃
-                    # if row['最低'] > row['higher_bound']:
-                    #     isCrossing = False
-                    #     currentPosition['stop'] = 0
-                    #     isCrossed = False
-                    #     crossMaSequence = 0
+                    if crossDeviateTrade == 0 and row['最低'] > row['higher_bound']:
+                        isCrossing = False
+                        currentPosition['stop'] = 0
+                        isCrossed = False
+                        crossMaSequence = 0
                     else:
                         # 只要收出阴线进场,阳线继续更新止损价
                         if row['开盘'] <= row['收盘']:
@@ -198,11 +204,11 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
                         isCrossed = False
                         crossMaSequence = 0
                     # K线最高价比布林带低,意思是离开了布林带,放弃
-                    # if row['最高'] < row['lower_bound']:
-                    #     isCrossing = False
-                    #     currentPosition['stop'] = 0
-                    #     isCrossed = False
-                    #     crossMaSequence = 0
+                    if crossDeviateTrade == 0 and row['最高'] < row['lower_bound']:
+                        isCrossing = False
+                        currentPosition['stop'] = 0
+                        isCrossed = False
+                        crossMaSequence = 0
                     else:
                         # 只要收出阳线进场,阴线继续更新止损价
                         if row['开盘'] >= row['收盘']:
@@ -254,40 +260,121 @@ def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, t
 
     # 输出数据处理
     result = result.rename(columns={"entryDate": "entryTime", "stop": "stopPrice", "outDate":"outTime"})
+    result['profitRatioCumsum'] = result['profitRatio'].cumsum()
     result['holdingTime'] = pd.to_datetime(result['outTime']) - pd.to_datetime(result['entryTime'])
     result['holdingDays'] = result['holdingTime'].map(lambda x: x.days)
     result['holdingHours'] = result['holdingTime'].map(lambda x: x.seconds/3600)
     result.drop('holding', axis='columns', inplace=True)
     result.drop('subgroup', axis='columns', inplace=True)
+    result.drop('holdingTime', axis='columns', inplace=True)
+    result = result.loc[:, ['entryPrice','direction','stopPrice','outPrice','isWin','profitRatio','profitRatioCumsum','entryTime','outTime','holdingDays','holdingHours']]
     outResult['trade_list'] = result
     return outResult
 
 
 # 保存策略数据
-def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None):
+def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None, excelFileName:str=None):
     if bool(out):
         stdout = '''代码:{}, 名称:{}, 总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(code, name, out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
         logger.info('[' + code + ']' + name + '统计结果:' + stdout)
         # logger.info('[' + code + ']' + name + '交易明细:')
         # logger.info(out['trade_list'])
         # 写入文件
-        filename = code
+        sheetname = code
         if beginTime is None:
-            filename = filename + '_none'
+            sheetname = sheetname + '_none'
         else:
-            filename = filename + '_' + beginTime
+            sheetname = sheetname + '_' + beginTime
         if endTime is None:
-            filename = filename + '_none'
+            sheetname = sheetname + '_none'
         else:
-            filename = filename + '_' + endTime 
-        file = open(os.path.join(scons.ma_bolling_path, filename +'_summary.txt'), 'w')
-        file.write(stdout)
-        file.close()
-        out['trade_list'].to_csv(os.path.join(scons.ma_bolling_path, filename + ".csv"), encoding="utf-8", index=False)
+            sheetname = sheetname + '_' + endTime 
+        # file = open(os.path.join(scons.ma_bolling_path, sheetname +'_summary.txt'), 'w')
+        # file.write(stdout)
+        # file.close()
+        # out['trade_list'].to_csv(os.path.join(scons.ma_bolling_path, sheetname + ".csv"), encoding="utf-8", index=False)
+        saveFileName=''
+        ws = None
+        if excelFileName is None:
+            saveFileName = os.path.join(scons.ma_bolling_path, sheetname + ".xlsx")
+        else:
+            saveFileName = excelFileName
+        #如果文件不存在,先创建
+        if os.path.exists(saveFileName) == False:
+            wb = Workbook()
+            ws = wb.active
+            ws.title=sheetname
+            wb.save(saveFileName)
+            wb = load_workbook(excelFileName)
+            ws = wb.get_sheet_by_name(sheetname)
+        else:
+            wb = load_workbook(excelFileName)
+            ws = wb.create_sheet(sheetname)
+        # 写入统计信息
+        ws.cell(row=1, column=2,value='代码')
+        ws.cell(row=1, column=3,value=code)
+        ws.cell(row=1, column=4,value='名称')
+        ws.cell(row=1, column=5,value=name)
+        ws.cell(row=1, column=6,value='总盈利(盈亏比)')
+        ws.cell(row=1, column=7,value=out['profit_ratio'])
+        ws.cell(row=2, column=2,value='总交易次数')
+        ws.cell(row=2, column=3,value=out['trade_times'])
+        ws.cell(row=2, column=4,value='盈利次数')
+        ws.cell(row=2, column=5,value=out['win_times'])
+        ws.cell(row=2, column=6,value='亏损次数')
+        ws.cell(row=2, column=7,value=out['lose_times'])
+        ws.cell(row=3, column=2,value='总胜率')
+        ws.cell(row=3, column=3,value=out['win_chance'])
+        ws.cell(row=3, column=4,value='交易频率')
+        ws.cell(row=3, column=5,value=out['average_ransaction_requency'])
+        ws.cell(row=3, column=6,value='最大连续亏损次数')
+        ws.cell(row=3, column=7,value=out['max_continuous_lose'])
+        ws.cell(row=4, column=2,value='多单次数')
+        ws.cell(row=4, column=3,value=out['buy_times'])
+        ws.cell(row=4, column=4,value='多单盈利次数')
+        ws.cell(row=4, column=5,value=out['buy_win_times'])
+        ws.cell(row=4, column=6,value='多单亏损次数')
+        ws.cell(row=4, column=7,value=out['buy_lose_times'])
+        ws.cell(row=5, column=2,value='空单次数')
+        ws.cell(row=5, column=3,value=out['sell_times'])
+        ws.cell(row=5, column=4,value='空单盈利次数')
+        ws.cell(row=5, column=5,value=out['sell_win_times'])
+        ws.cell(row=5, column=6,value='空单亏损次数')
+        ws.cell(row=5, column=7,value=out['sell_lose_times'])
+
+        # 写入交易明细
+        ws.append([])
+        for r in dataframe_to_rows(out['trade_list'], index=True, header=True):
+            if len(r) <= 1:
+                continue
+            ws.append(r)
+        
+        # 绘制总盈利(盈亏比)图
+        scatter_chart = ScatterChart()
+        # 设置标题
+        scatter_chart.title = '总盈利(盈亏比)曲线'
+        # 设置颜色
+        scatter_chart.style = 13
+        # 设置x轴y轴标题
+        scatter_chart.width = 30
+        scatter_chart.height = 15
+        scatter_chart.legend = None
+        scatter_chart.x_axis.title = '总盈利(盈亏比)'
+        scatter_chart.y_axis.title = '时间'
+        
+        # 创建x轴的数据来源
+        xvalues = Reference(ws, min_col=10, min_row=8, max_row=8 + len(out['trade_list']))
+        # 创建yvalues
+        yvalues = Reference(ws, min_col=8, min_row=7, max_row=7 + len(out['trade_list']))
+        series = Series(yvalues, xvalues=xvalues, title_from_data=True)
+        scatter_chart.series.append(series)
+        # 将散点图添加到ws工作表中
+        ws.add_chart(scatter_chart, 'N1')
+        wb.save(saveFileName)
 
 
 # 单个外汇回测
-def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeDirection=0):
+def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeDirection=0, excelFileName:str=None):
     """
     外汇回测
     入参
@@ -313,7 +400,7 @@ def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeD
     kdata['日期'] = pd.to_datetime(kdata['日期'])
     kdata = kdata.rename(columns={"<OPEN>":"开盘", "<HIGH>":"最高", "<LOW>":"最低", "<CLOSE>":"收盘"})
     out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
-    save_testing_data(out, filename, name, beginTime=beginTime, endTime=endTime)
+    save_testing_data(out, filename, name, beginTime=beginTime, endTime=endTime, excelFileName=excelFileName)
     logger.info('[' + filename + ']' + '回测结束')
     out['code'] = filename
     out['name'] = name
@@ -324,13 +411,15 @@ def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeD
 def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection=0):
     basic = pd.read_csv(ccons.forex_basic_file, dtype={'代码': str})
     summaryList = []
+    # 先创建excel文件
+    filename = os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
     for index in basic.index:
         row = basic.loc[index, :]
         s_code = row['代码']
         name = row['名称']
         for cyc in cycle:
             try:
-                out = backtesting_forex(s_code, cyc, name, beginTime, endTime, tradeDirection)
+                out = backtesting_forex(s_code, cyc, name, beginTime, endTime, tradeDirection, filename)
                 if bool(out):
                     # stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
                     # logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
@@ -347,6 +436,16 @@ def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection
     file.write(summaryOut)
     file.close()
     summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
+    # 保存excel
+    wb = load_workbook(filename)
+    ws = wb.create_sheet('all_forex_summary', 0)
+    # 写入统计明细
+    ws.append([])
+    for r in dataframe_to_rows(summary, index=True, header=True):
+        if len(r) <= 1:
+            continue
+        ws.append(r)
+    wb.save(filename)
 
 
 # 单个股票回测
@@ -401,4 +500,4 @@ if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
     # backtesting_forex('EURUSD','H1', beginTime='2022-01-01', endTime='2023-09-20')
-    backtesting_all_forex(['H1'], beginTime='2022-01-01', endTime='2023-09-20')
+    backtesting_all_forex(['D1'], beginTime='2022-01-01', endTime='2022-12-31')
