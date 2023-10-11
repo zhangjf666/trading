@@ -305,10 +305,10 @@ def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None, exc
             ws = wb.active
             ws.title=sheetname
             wb.save(saveFileName)
-            wb = load_workbook(excelFileName)
+            wb = load_workbook(saveFileName)
             ws = wb.get_sheet_by_name(sheetname)
         else:
-            wb = load_workbook(excelFileName)
+            wb = load_workbook(saveFileName)
             ws = wb.create_sheet(sheetname)
         # 写入统计信息
         ws.cell(row=1, column=2,value='代码')
@@ -325,7 +325,7 @@ def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None, exc
         ws.cell(row=2, column=7,value=out['lose_times'])
         ws.cell(row=3, column=2,value='总胜率')
         ws.cell(row=3, column=3,value=out['win_chance'])
-        ws.cell(row=3, column=4,value='交易频率')
+        ws.cell(row=3, column=4,value='交易频率(天)')
         ws.cell(row=3, column=5,value=out['average_ransaction_requency'])
         ws.cell(row=3, column=6,value='最大连续亏损次数')
         ws.cell(row=3, column=7,value=out['max_continuous_lose'])
@@ -356,11 +356,12 @@ def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None, exc
         # 设置颜色
         scatter_chart.style = 13
         # 设置x轴y轴标题
+        scatter_chart.x_axis.tickLblPos = 'low'
         scatter_chart.width = 30
         scatter_chart.height = 15
         scatter_chart.legend = None
-        scatter_chart.x_axis.title = '总盈利(盈亏比)'
-        scatter_chart.y_axis.title = '时间'
+        scatter_chart.x_axis.title = '时间'
+        scatter_chart.y_axis.title = '总盈利(盈亏比)'
         
         # 创建x轴的数据来源
         xvalues = Reference(ws, min_col=10, min_row=8, max_row=8 + len(out['trade_list']))
@@ -412,7 +413,7 @@ def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection
     basic = pd.read_csv(ccons.forex_basic_file, dtype={'代码': str})
     summaryList = []
     # 先创建excel文件
-    filename = os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
+    filename = os.path.join(scons.ma_bolling_path, 'all_forex_summary_' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
     for index in basic.index:
         row = basic.loc[index, :]
         s_code = row['代码']
@@ -432,24 +433,31 @@ def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection
     summary = pd.DataFrame(summaryList)
     summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
     logger.info(summaryOut)
-    file = open(os.path.join(scons.ma_bolling_path, 'all_forex_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
-    file.write(summaryOut)
-    file.close()
-    summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
+    # file = open(os.path.join(scons.ma_bolling_path, 'all_forex_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
+    # file.write(summaryOut)
+    # file.close()
+    # summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
     # 保存excel
     wb = load_workbook(filename)
     ws = wb.create_sheet('all_forex_summary', 0)
     # 写入统计明细
-    ws.append([])
     for r in dataframe_to_rows(summary, index=True, header=True):
         if len(r) <= 1:
             continue
         ws.append(r)
+    # 统计信息
+    maxRow = ws.max_row
+    ws['A'+str(maxRow+1)].value = "总计"
+    ws['B'+str(maxRow+1)].value = "=SUM(B2:B"+str(maxRow)+")"
+    ws['C'+str(maxRow+1)].value = "=SUM(C2:C"+str(maxRow)+")"
+    ws['D'+str(maxRow+1)].value = "=SUM(D2:D"+str(maxRow)+")"
+    ws['E'+str(maxRow+1)].value = "=SUM(E2:E"+str(maxRow)+")"
+    ws['F'+str(maxRow+1)].value = "=C"+str(maxRow+1)+"/B"+str(maxRow+1)+"*100"
     wb.save(filename)
 
 
 # 单个股票回测
-def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirection=0):
+def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirection=0, excelFileName:str=None):
     logger.info('[' + code + ']' + name + '回测开始')
     file_name = os.path.join(ccons.stock_history_path, code+".csv")
     exist = os.path.exists(file_name)
@@ -461,7 +469,7 @@ def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirectio
     kdata['日期'] = pd.to_datetime(kdata.apply(lambda x: str(x['日期']), axis=1), format="%Y-%m-%d")
     kdata['日期'] = kdata['日期'].dt.strftime('%Y-%m-%d %H:%M:%S')
     out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
-    save_testing_data(out, code, name, beginTime=beginTime, endTime=endTime)
+    save_testing_data(out, code, name, beginTime=beginTime, endTime=endTime, excelFileName=excelFileName)
     logger.info('[' + code + ']' + name + '回测结束')
     out['code'] = code
     out['name'] = name
@@ -472,6 +480,8 @@ def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirectio
 def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
     basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
     summaryList = []
+    # 先创建excel文件
+    filename = os.path.join(scons.ma_bolling_path, 'all_stock_summary_' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
     for index in basic.index:
         row = basic.loc[index, :]
         s_code = row['代码']
@@ -490,14 +500,31 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
     summary = pd.DataFrame(summaryList)
     summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
     logger.info(summaryOut)
-    file = open(os.path.join(scons.ma_bolling_path, 'all_stock_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
-    file.write(summaryOut)
-    file.close()
-    summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_stock_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
+    # file = open(os.path.join(scons.ma_bolling_path, 'all_stock_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
+    # file.write(summaryOut)
+    # file.close()
+    # summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_stock_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
+    # 保存excel
+    wb = load_workbook(filename)
+    ws = wb.create_sheet('all_stock_summary', 0)
+    # 写入统计明细
+    for r in dataframe_to_rows(summary, index=True, header=True):
+        if len(r) <= 1:
+            continue
+        ws.append(r)
+    # 统计信息
+    maxRow = ws.max_row
+    ws['A'+str(maxRow+1)].value = "总计"
+    ws['B'+str(maxRow+1)].value = "=SUM(B2:B"+str(maxRow)+")"
+    ws['C'+str(maxRow+1)].value = "=SUM(C2:C"+str(maxRow)+")"
+    ws['D'+str(maxRow+1)].value = "=SUM(D2:D"+str(maxRow)+")"
+    ws['E'+str(maxRow+1)].value = "=SUM(E2:E"+str(maxRow)+")"
+    ws['F'+str(maxRow+1)].value = "=C"+str(maxRow+1)+"/B"+str(maxRow+1)+"*100"
+    wb.save(filename)
 
 
 if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
-    # backtesting_forex('EURUSD','H1', beginTime='2022-01-01', endTime='2023-09-20')
-    backtesting_all_forex(['D1'], beginTime='2022-01-01', endTime='2022-12-31')
+    # backtesting_forex('EURUSD','H4', beginTime='2022-01-01', endTime='2023-09-20')
+    backtesting_all_forex(['H1'], beginTime='2022-01-01', endTime='2022-12-31')
