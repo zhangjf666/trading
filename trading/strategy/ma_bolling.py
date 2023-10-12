@@ -409,7 +409,7 @@ def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeD
 
 
 # 所有外汇回测
-def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection=0):
+def backtesting_all_forex(code:[]=[], cycle:[]=['D1'], beginTime=None, endTime=None, tradeDirection=0):
     basic = pd.read_csv(ccons.forex_basic_file, dtype={'代码': str})
     summaryList = []
     # 先创建excel文件
@@ -418,6 +418,8 @@ def backtesting_all_forex(cycle:[], beginTime=None, endTime=None, tradeDirection
         row = basic.loc[index, :]
         s_code = row['代码']
         name = row['名称']
+        if len(code) > 0 and s_code not in code:
+            continue
         for cyc in cycle:
             try:
                 out = backtesting_forex(s_code, cyc, name, beginTime, endTime, tradeDirection, filename)
@@ -526,5 +528,5 @@ def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
 if __name__ == '__main__':
     # backtesting_all_stock(tradeDirection=1)
     # backtesting_stock('000002', '万科A')
-    # backtesting_forex('EURUSD','H4', beginTime='2022-01-01', endTime='2023-09-20')
-    backtesting_all_forex(['H1'], beginTime='2022-01-01', endTime='2022-12-31')
+    # backtesting_forex('EURUSD','H1', beginTime='2007-01-01', endTime='2023-09-20')
+    backtesting_all_forex(code=[],cycle=['H1'],beginTime='2008-01-01', endTime='2008-12-31')
