@@ -21,7 +21,6 @@ struct TradeInfo
    bool              isWin; //是否盈利
    datetime          entryTime; //入场时间
    double            lot; //开仓数量
-   int               serial; //交易序号
   };
 //入参
 input double StopLimit= 100.00;    // 最大止损金额
@@ -44,6 +43,7 @@ bool   IsPostioned=false;  //是否已开仓
 int    CrossMaSequence=0;  //出现穿过布林带时的多头空头状态,1:多头,-1:空头
 double ContractSize=0;     //标准合约大小
 double SymbolPoint=0;      //交易品种点值
+uint   Serial=1;           //交易序号
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -276,7 +276,7 @@ void CheckForOpen(void)
                   tradeInfo.direction=2;
                   tradeInfo.lot=TradeSizeOptimized();
                   tradeInfo.entryTime=TimeLocal();
-                  tradeInfo.serial=rand();
+                  Serial=Serial+1;
                   signal=true;
                  }
                else
@@ -317,7 +317,7 @@ void CheckForOpen(void)
                   tradeInfo.direction=1;
                   tradeInfo.lot=TradeSizeOptimized();
                   tradeInfo.entryTime=TimeLocal();
-                  tradeInfo.serial=rand();
+                  Serial=Serial+1;
                   signal=true;
                  }
                else
@@ -335,18 +335,25 @@ void CheckForOpen(void)
         {
          FormatTradeInfo();
          //循环开仓,确保开成功
+         int i=1;
          do
          {
-            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),tradeInfo.stopPrice,0,IntegerToString(tradeInfo.serial));
+            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),tradeInfo.stopPrice,0,IntegerToString(Serial));
             Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("%s_%s 编号:%d,第%d次开仓,开仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE)
+            {
+               break;
+            }
          }
-         while(ExtTrade.ResultRetcode()!=TRADE_RETCODE_DONE);
+         while(i<=10);
 
-         string text=StringFormat("%s_%s 开仓,编号:%d,开仓价格:%f,止损价格:%f,开仓数量:%f,方向:%s,开仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),tradeInfo.serial,tradeInfo.entryPrice,
+         string text=StringFormat("%s_%s 开仓,编号:%d,开仓价格:%f,止损价格:%f,开仓数量:%f,方向:%s,开仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.entryPrice,
                                   tradeInfo.stopPrice,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送开仓邮件
-         string title=StringFormat("%s_%s 编号:%d 开仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),tradeInfo.serial);
+         string title=StringFormat("%s_%s 编号:%d 开仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送开仓通知
          SendNotification(text);
@@ -450,8 +457,9 @@ void CheckForClose(void)
 //判断出场条件, 做多判断触碰布林上轨,做空判断触碰布林下轨
    if(tradeInfo.direction==1)
      {
+      double bid=SymbolInfoDouble(_Symbol,SYMBOL_BID);
       //触碰上轨,以上轨价格平仓
-      if(tick.bid>=bandsUpper[0])
+      if(bid>=bandsUpper[0])
         {
          tradeInfo.outTime=TimeLocal();
          tradeInfo.outPrice=bandsUpper[0];
@@ -464,7 +472,7 @@ void CheckForClose(void)
         }
       //止损
       else
-         if(tick.bid<=tradeInfo.stopPrice)
+         if(bid<=tradeInfo.stopPrice)
            {
             tradeInfo.outTime=TimeLocal();
             tradeInfo.outPrice=tradeInfo.stopPrice;
@@ -479,8 +487,9 @@ void CheckForClose(void)
    else
       if(tradeInfo.direction==2)
         {
+         double ask=SymbolInfoDouble(_Symbol,SYMBOL_ASK);
          //触碰下轨,以下轨价格平仓
-         if(tick.ask<=bandslower[0])
+         if(ask<=bandslower[0])
            {
             tradeInfo.outTime=TimeLocal();
             tradeInfo.outPrice=bandslower[0];
@@ -492,7 +501,7 @@ void CheckForClose(void)
             signal=true;
            }
          //止损
-         if(tick.ask>=tradeInfo.stopPrice)
+         if(ask>=tradeInfo.stopPrice)
            {
             tradeInfo.outTime=TimeLocal();
             tradeInfo.outPrice=tradeInfo.stopPrice;
@@ -511,18 +520,25 @@ void CheckForClose(void)
         {
          FormatTradeInfo();
          //循环平仓,确保平掉
+         int i=1;
          do
          {
             ExtTrade.PositionClose(_Symbol);
             Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("%s_%s 编号:%d,第%d次平仓,平仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE)
+            {
+               break;
+            }
          }
-         while(ExtTrade.ResultRetcode()!=TRADE_RETCODE_DONE);
+         while(i<=10);
          
-         string text=StringFormat("%s_%s 平仓,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),tradeInfo.serial,tradeInfo.outPrice,
+         string text=StringFormat("%s_%s 平仓,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
                                   tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin?"是":"否",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送平仓邮件
-         string title=StringFormat("%s_%s 编号:%d 平仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),tradeInfo.serial);
+         string title=StringFormat("%s_%s 编号:%d 平仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送平仓通知
          SendNotification(text);
