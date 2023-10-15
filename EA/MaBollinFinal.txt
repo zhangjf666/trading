@@ -43,7 +43,7 @@ bool   IsPostioned=false;  //是否已开仓
 int    CrossMaSequence=0;  //出现穿过布林带时的多头空头状态,1:多头,-1:空头
 double ContractSize=0;     //标准合约大小
 double SymbolPoint=0;      //交易品种点值
-uint   Serial=1;           //交易序号
+uint   Serial=0;           //交易序号
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
