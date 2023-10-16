@@ -387,6 +387,16 @@ void CheckForOpen(void)
               {
                break;
               }
+            if(i>10)
+              {
+               //开仓失败,发送邮件
+               string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,开仓失败,错误代码:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode);
+               printf(text);
+               string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 开仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               return;
+              }
            }
          while(i<=10);
 
@@ -710,14 +720,24 @@ void CheckForClose(void)
               {
                break;
               }
+            if(i>10)
+              {
+               //平仓失败,发送邮件
+               string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,平仓失败,错误代码:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode);
+               printf(text);
+               string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               return;
+              }
            }
          while(i<=10);
-
+         //发送平仓邮件
          string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
                                   tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin?"是":"否",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送平仓邮件
-         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓事件",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送平仓通知
          SendNotification(text);
