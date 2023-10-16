@@ -49,6 +49,8 @@ int    CrossMaSequence=0;  //出现穿过布林带时的多头空头状态,1:多
 double ContractSize=0;     //标准合约大小
 double SymbolPoint=0;      //交易品种点值
 uint   Serial=0;           //交易序号
+int    AccountId=0;        //交易账号
+bool   IsRealAccount=false;//是否真实账户,true:是,false:否
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -380,7 +382,7 @@ void CheckForOpen(void)
             ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),tradeInfo.stopPrice,0,IntegerToString(Serial));
             Sleep(500);
             uint retCode=ExtTrade.ResultRetcode();
-            printf(StringFormat("%s_%s 编号:%d,第%d次开仓,开仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            printf(StringFormat("品种:%s_%s,编号:%d,第%d次开仓,开仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
             if(retCode==TRADE_RETCODE_DONE)
               {
                break;
@@ -388,11 +390,11 @@ void CheckForOpen(void)
            }
          while(i<=10);
 
-         string text=StringFormat("%s_%s 开仓,编号:%d,开仓价格:%f,止损价格:%f,开仓数量:%f,方向:%s,开仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.entryPrice,
+         string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,开仓价格:%f,止损价格:%f,开仓数量:%f,方向:%s,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.entryPrice,
                                   tradeInfo.stopPrice,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送开仓邮件
-         string title=StringFormat("%s_%s 编号:%d 开仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 开仓事件",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送开仓通知
          SendNotification(text);
@@ -703,19 +705,19 @@ void CheckForClose(void)
             ExtTrade.PositionClose(_Symbol);
             Sleep(500);
             uint retCode=ExtTrade.ResultRetcode();
-            printf(StringFormat("%s_%s 编号:%d,第%d次平仓,平仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
-            if(retCode==TRADE_RETCODE_DONE)
+            printf(StringFormat("品种:%s_%s,编号:%d,第%d次平仓,平仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE||retCode==TRADE_RETCODE_POSITION_CLOSED)
               {
                break;
               }
            }
          while(i<=10);
 
-         string text=StringFormat("%s_%s 平仓,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s", _Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
+         string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
                                   tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin?"是":"否",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送平仓邮件
-         string title=StringFormat("%s_%s 编号:%d 平仓事件",_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓事件",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送平仓通知
          SendNotification(text);
@@ -766,6 +768,8 @@ int OnInit(void)
    ExtTrade.SetTypeFillingBySymbol(Symbol());
    ContractSize=SymbolInfoDouble(_Symbol,SYMBOL_TRADE_CONTRACT_SIZE);
    SymbolPoint=SymbolInfoDouble(_Symbol,SYMBOL_POINT);
+   AccountId=AccountInfoInteger(ACCOUNT_LOGIN);
+   IsRealAccount=AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_REAL;
 //初始化数据
 //--- 均线跟布林带指标加载
    ExtHandleMa40=iMA(_Symbol,_Period,40,0,MODE_EMA,PRICE_CLOSE);
