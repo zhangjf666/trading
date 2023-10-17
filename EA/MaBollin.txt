@@ -51,6 +51,7 @@ double SymbolPoint=0;      //交易品种点值
 uint   Serial=0;           //交易序号
 int    AccountId=0;        //交易账号
 bool   IsRealAccount=false;//是否真实账户,true:是,false:否
+double OpenStopPrice=0;  //开仓时需要设置止损的K线对应价格,用于设置止损
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -290,7 +291,7 @@ void CheckForOpen(void)
             //只要收出阴线且阴线没有穿过布林带中线进场,阳线继续更新止损价
             if(current.open<=current.close)
               {
-               tradeInfo.stopPrice=fmax(current.high, tradeInfo.stopPrice);
+               OpenStopPrice=fmax(current.high, OpenStopPrice);
               }
             if(current.open>current.close)
               {
@@ -298,7 +299,8 @@ void CheckForOpen(void)
                  {
                   if(OpenDeviateByMa==0 || current.close<maxMa+(SymbolPoint*OpenDeviateByMa))
                     {
-                     tradeInfo.stopPrice=fmax(current.high, tradeInfo.stopPrice)+(StopPoint*SymbolPoint);
+                     OpenStopPrice=fmax(current.high, OpenStopPrice);
+                     tradeInfo.stopPrice=OpenStopPrice+(StopPoint*SymbolPoint);
                      tradeInfo.moveStopPrice=tradeInfo.stopPrice;
                      tradeInfo.entryPrice=current.close;
                      tradeInfo.lot=TradeSizeOptimized();
@@ -339,7 +341,7 @@ void CheckForOpen(void)
             //只要收出阳线且阳线没有穿过布林带中线进场,阴线继续更新止损价
             if(current.open>=current.close)
               {
-               tradeInfo.stopPrice=fmin(current.low, tradeInfo.stopPrice);
+               OpenStopPrice=fmin(current.low, OpenStopPrice);
               }
             if(current.open<current.close)
               {
@@ -347,7 +349,8 @@ void CheckForOpen(void)
                  {
                   if(OpenDeviateByMa==0 || current.close>maxMa-(SymbolPoint*OpenDeviateByMa))
                     {
-                     tradeInfo.stopPrice=fmin(current.low, tradeInfo.stopPrice)-(StopPoint*SymbolPoint);
+                     OpenStopPrice=fmin(current.low, OpenStopPrice);
+                     tradeInfo.stopPrice=OpenStopPrice-(StopPoint*SymbolPoint);
                      tradeInfo.moveStopPrice=tradeInfo.stopPrice;
                      tradeInfo.entryPrice=current.close;
                      tradeInfo.direction=1;
@@ -387,27 +390,28 @@ void CheckForOpen(void)
               {
                break;
               }
-            if(i>10)
+            if(i>20)
               {
                //开仓失败,发送邮件
-               string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,开仓失败,错误代码:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode);
+               string text=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
                printf(text);
-               string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 开仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               string title=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
                SendMail(title, text);
                SendNotification(text);
                return;
               }
            }
-         while(i<=10);
+         while(i<=20);
 
-         string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,开仓价格:%f,止损价格:%f,开仓数量:%f,方向:%s,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.entryPrice,
-                                  tradeInfo.stopPrice,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
+         string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送开仓邮件
-         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 开仓事件",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送开仓通知
          SendNotification(text);
+         //开仓成功后需要把重置
+         OpenStopPrice=0;
         }
      }
 //---
@@ -421,6 +425,7 @@ void ResetState()
    IsCrossing=false;
    tradeInfo.stopPrice=0;
    CrossMaSequence=0;
+   OpenStopPrice=0;
   }
 //判断均线多头还是空头
 int CalcMaSequence(double &ma[])
@@ -720,30 +725,79 @@ void CheckForClose(void)
               {
                break;
               }
-            if(i>10)
+            if(i>20)
               {
                //平仓失败,发送邮件
-               string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,平仓失败,错误代码:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode);
+               string text=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
                printf(text);
-               string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               string title=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
                SendMail(title, text);
                SendNotification(text);
                return;
               }
            }
-         while(i<=10);
+         while(i<=20);
          //发送平仓邮件
-         string text=StringFormat("%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%f,是否盈利:%s,平仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
+         string text=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%.2f,是否盈利:%s,平仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
                                   tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin?"是":"否",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS));
          printf(text);
          //发送平仓邮件
-         string title=StringFormat("%s账号:%d,品种:%s_%s,编号:%d 平仓失败",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
          //发送平仓通知
          SendNotification(text);
         }
      }
 //---
+  }
+//错误代码翻译
+string transReturnCode(uint returnCode)
+  {
+   if(returnCode==TRADE_RETCODE_NO_MONEY)
+   {
+      return "资金(保证金)不足";
+   }
+   if(returnCode==TRADE_RETCODE_POSITION_CLOSED)
+   {
+      return "持仓已关闭";
+   }
+   if(returnCode==TRADE_RETCODE_MARKET_CLOSED)
+   {
+      return "收市";
+   }
+   if(returnCode==TRADE_RETCODE_REQUOTE)
+   {
+      return "重新报价";
+   }
+   if(returnCode==TRADE_RETCODE_CONNECTION)
+   {
+      return "与服务器无连接";
+   }
+   if(returnCode==TRADE_RETCODE_LIMIT_ORDERS)
+   {
+      return "待办订单数量达到限制";
+   }
+   if(returnCode==TRADE_RETCODE_REJECT)
+   {
+      return "拒绝请求";
+   }
+   if(returnCode==TRADE_RETCODE_INVALID_VOLUME)
+   {
+      return "无效成交量";
+   }
+   if(returnCode==TRADE_RETCODE_INVALID_PRICE)
+   {
+      return "无效价格";
+   }
+   if(returnCode==TRADE_RETCODE_TRADE_DISABLED)
+   {
+      return "关闭交易";
+   }
+   if(returnCode==TRADE_RETCODE_TOO_MANY_REQUESTS)
+   {
+      return "太频繁的请求";
+   }
+   return "未知错误";
   }
 //+------------------------------------------------------------------+
 //| Position select depending on netting or hedging                  |
