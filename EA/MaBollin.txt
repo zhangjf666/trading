@@ -250,7 +250,7 @@ void CheckForOpen(void)
            {
             IsCrossed=true;
             IsCrossing=true;
-            tradeInfo.stopPrice=current.high;
+            OpenStopPrice=current.high;
             CrossMaSequence=-1;
            }
         }
@@ -260,7 +260,7 @@ void CheckForOpen(void)
            {
             IsCrossed=true;
             IsCrossing=true;
-            tradeInfo.stopPrice=current.low;
+            OpenStopPrice=current.low;
             CrossMaSequence=1;
            }
         }
@@ -285,6 +285,7 @@ void CheckForOpen(void)
          //   IsCrossing=false;
          //   tradeInfo.stopPrice=0;
          //   CrossMaSequence=0;
+         //   OpenStopPrice=0;
          //  }
          else
            {
@@ -335,6 +336,7 @@ void CheckForOpen(void)
          //   IsCrossing=false;
          //   tradeInfo.stopPrice=0;
          //   CrossMaSequence=0;
+         //   OpenStopPrice=0;
          //  }
          else
            {
