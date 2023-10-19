@@ -400,6 +400,8 @@ void CheckForOpen(void)
                string title=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
                SendMail(title, text);
                SendNotification(text);
+               //开仓失败重置状态,之后重新判断进场
+               ResetState();
                return;
               }
            }
@@ -412,8 +414,8 @@ void CheckForOpen(void)
          SendMail(title, text);
          //发送开仓通知
          SendNotification(text);
-         //开仓成功后需要把重置
-         OpenStopPrice=0;
+         //开仓成功后需要把状态重置
+         ResetState();
         }
      }
 //---
@@ -425,7 +427,6 @@ void ResetState()
   {
    IsCrossed=false;
    IsCrossing=false;
-   tradeInfo.stopPrice=0;
    CrossMaSequence=0;
    OpenStopPrice=0;
   }
@@ -541,9 +542,6 @@ void CheckForClose(void)
          tradeInfo.outPrice=tradeInfo.stopPrice;
          tradeInfo.profitRatio=-1;
          tradeInfo.isWin=false;
-         IsCrossed=false;
-         IsCrossing=false;
-         CrossMaSequence=0;
          signal=true;
         }
       if(!signal)
@@ -558,9 +556,6 @@ void CheckForClose(void)
                tradeInfo.outPrice=bandsUpper[0];
                tradeInfo.profitRatio=(tradeInfo.outPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
                tradeInfo.isWin=true;
-               IsCrossed=false;
-               IsCrossing=false;
-               CrossMaSequence=0;
                signal=true;
               }
            }
@@ -593,9 +588,6 @@ void CheckForClose(void)
                      tradeInfo.isWin=false;
                      tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.moveStopPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
                     }
-                  IsCrossed=false;
-                  IsCrossing=false;
-                  CrossMaSequence=0;
                   signal=true;
                  }
               }
@@ -612,9 +604,6 @@ void CheckForClose(void)
                      tradeInfo.outPrice=bid;
                      tradeInfo.profitRatio=(tradeInfo.outPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
                      tradeInfo.isWin=true;
-                     IsCrossed=false;
-                     IsCrossing=false;
-                     CrossMaSequence=0;
                      signal=true;
                     }
                  }
@@ -631,9 +620,6 @@ void CheckForClose(void)
             tradeInfo.outPrice=tradeInfo.stopPrice;
             tradeInfo.profitRatio=-1;
             tradeInfo.isWin=false;
-            IsCrossed=false;
-            IsCrossing=false;
-            CrossMaSequence=0;
             signal=true;
            }
          if(!signal)
@@ -647,9 +633,6 @@ void CheckForClose(void)
                   tradeInfo.outPrice=bandslower[0];
                   tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.outPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
                   tradeInfo.isWin=true;
-                  IsCrossed=false;
-                  IsCrossing=false;
-                  CrossMaSequence=0;
                   signal=true;
                  }
               }
@@ -682,9 +665,6 @@ void CheckForClose(void)
                         tradeInfo.isWin=false;
                         tradeInfo.profitRatio=(tradeInfo.moveStopPrice-tradeInfo.entryPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
                        }
-                     IsCrossed=false;
-                     IsCrossing=false;
-                     CrossMaSequence=0;
                      signal=true;
                     }
                  }
@@ -701,9 +681,6 @@ void CheckForClose(void)
                         tradeInfo.outPrice=ask;
                         tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.outPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
                         tradeInfo.isWin=true;
-                        IsCrossed=false;
-                        IsCrossing=false;
-                        CrossMaSequence=0;
                         signal=true;
                        }
                     }
@@ -783,6 +760,10 @@ string transReturnCode(uint returnCode)
    {
       return "拒绝请求";
    }
+   if(returnCode==TRADE_RETCODE_INVALID)
+   {
+      return "无效请求";
+   }
    if(returnCode==TRADE_RETCODE_INVALID_VOLUME)
    {
       return "无效成交量";
@@ -790,6 +771,10 @@ string transReturnCode(uint returnCode)
    if(returnCode==TRADE_RETCODE_INVALID_PRICE)
    {
       return "无效价格";
+   }
+   if(returnCode==TRADE_RETCODE_INVALID_STOPS)
+   {
+      return "无效止损价";
    }
    if(returnCode==TRADE_RETCODE_TRADE_DISABLED)
    {
