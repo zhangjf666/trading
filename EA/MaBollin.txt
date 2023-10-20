@@ -733,57 +733,57 @@ void CheckForClose(void)
 string transReturnCode(uint returnCode)
   {
    if(returnCode==TRADE_RETCODE_NO_MONEY)
-   {
+     {
       return "资金(保证金)不足";
-   }
+     }
    if(returnCode==TRADE_RETCODE_POSITION_CLOSED)
-   {
+     {
       return "持仓已关闭";
-   }
+     }
    if(returnCode==TRADE_RETCODE_MARKET_CLOSED)
-   {
+     {
       return "收市";
-   }
+     }
    if(returnCode==TRADE_RETCODE_REQUOTE)
-   {
+     {
       return "重新报价";
-   }
+     }
    if(returnCode==TRADE_RETCODE_CONNECTION)
-   {
+     {
       return "与服务器无连接";
-   }
+     }
    if(returnCode==TRADE_RETCODE_LIMIT_ORDERS)
-   {
+     {
       return "待办订单数量达到限制";
-   }
+     }
    if(returnCode==TRADE_RETCODE_REJECT)
-   {
+     {
       return "拒绝请求";
-   }
+     }
    if(returnCode==TRADE_RETCODE_INVALID)
-   {
+     {
       return "无效请求";
-   }
+     }
    if(returnCode==TRADE_RETCODE_INVALID_VOLUME)
-   {
+     {
       return "无效成交量";
-   }
+     }
    if(returnCode==TRADE_RETCODE_INVALID_PRICE)
-   {
+     {
       return "无效价格";
-   }
+     }
    if(returnCode==TRADE_RETCODE_INVALID_STOPS)
-   {
+     {
       return "无效止损价";
-   }
+     }
    if(returnCode==TRADE_RETCODE_TRADE_DISABLED)
-   {
+     {
       return "关闭交易";
-   }
+     }
    if(returnCode==TRADE_RETCODE_TOO_MANY_REQUESTS)
-   {
+     {
       return "太频繁的请求";
-   }
+     }
    return "未知错误";
   }
 //+------------------------------------------------------------------+
@@ -801,6 +801,20 @@ bool SelectPosition()
          string position_symbol=PositionGetSymbol(i);
          if(_Symbol==position_symbol && MA_MAGIC==PositionGetInteger(POSITION_MAGIC))
            {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
             res=true;
             break;
            }
@@ -812,7 +826,25 @@ bool SelectPosition()
       if(!PositionSelect(_Symbol))
          return(false);
       else
-         return(PositionGetInteger(POSITION_MAGIC)==MA_MAGIC); //---check Magic number
+         if(PositionGetInteger(POSITION_MAGIC)==MA_MAGIC) //---check Magic number
+           {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
+            return true;
+           }
+      return(false);
      }
 //--- result for Hedging mode
    return(res);
