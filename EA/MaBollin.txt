@@ -52,6 +52,7 @@ uint   Serial=0;           //交易序号
 int    AccountId=0;        //交易账号
 bool   IsRealAccount=false;//是否真实账户,true:是,false:否
 double OpenStopPrice=0;  //开仓时需要设置止损的K线对应价格,用于设置止损
+string GlobalSerialName=""; //保存序号的全局变量名称
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -307,7 +308,6 @@ void CheckForOpen(void)
                      tradeInfo.lot=TradeSizeOptimized();
                      tradeInfo.direction=2;
                      tradeInfo.entryTime=TimeLocal();
-                     Serial=Serial+1;
                      signal=true;
                     }
                   else
@@ -358,7 +358,6 @@ void CheckForOpen(void)
                      tradeInfo.direction=1;
                      tradeInfo.lot=TradeSizeOptimized();
                      tradeInfo.entryTime=TimeLocal();
-                     Serial=Serial+1;
                      signal=true;
                     }
                   else
@@ -380,6 +379,7 @@ void CheckForOpen(void)
       if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && Bars(_Symbol,_Period)>100)
         {
          FormatTradeInfo();
+         Serial=Serial+1;
          //循环开仓,确保开成功
          int i=1;
          do
@@ -416,6 +416,9 @@ void CheckForOpen(void)
          SendNotification(text);
          //开仓成功后需要把状态重置
          ResetState();
+         //更新全局变量
+         GlobalVariableSet(GlobalSerialName, Serial);
+         GlobalVariablesFlush();
         }
      }
 //---
@@ -876,6 +879,12 @@ int OnInit(void)
    ExtHandleMainMa50=iMA(_Symbol,MainTimeFrames,50,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa60=iMA(_Symbol,MainTimeFrames,60,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa70=iMA(_Symbol,MainTimeFrames,70,0,MODE_EMA,PRICE_CLOSE);
+//加载全局序号
+   GlobalSerialName=StringFormat("%s_%s_%d_Serial",_Symbol,StringSubstr(EnumToString(_Period),7),MA_MAGIC);
+   if(GlobalVariableCheck(GlobalSerialName))
+   {
+      Serial=GlobalVariableGet(GlobalSerialName);
+   }
 //是否有仓位
    IsPostioned=SelectPosition();
 //--- ok
