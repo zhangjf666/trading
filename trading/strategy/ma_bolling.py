@@ -1,532 +1,941 @@
-# -*- coding:utf-8 -*-
-"""
-Date: 2023-09-18 22:00:56
-Desc: 均线-布林带买卖回测
-"""
+//+------------------------------------------------------------------+
+//|                                                    Ma Bollin.mq5 |
+//|                                 Copyright 2000-2023, Alex zhang. |
+//|                                             im.zhangjf@gmail.com |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2000-2023, Alex zhang."
+#property link      "im.zhangjf@gmail.com"
+#property version   "1.00"
 
-import os
-import traceback
-import pandas as pd
-from datetime import datetime
-from openpyxl import Workbook,load_workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.chart import Reference,ScatterChart  # Reference：图标所用信息
-from openpyxl.chart import Series
-import trading.collector.constant as ccons
-import trading.strategy.calc as calc
-import trading.strategy.constant as scons
-from trading.config.logger import logger
+#include <Trade\Trade.mqh>
 
-ma_list = [50, 60, 70]
-ma_column = ['ma_50', 'ma_60', 'ma_70']
+//持仓结构
+struct TradeInfo
+  {
+   int               direction; //交易方向,1:买入,2:卖出
+   datetime          outTime; //出场时间
+   double            outPrice; //出场价格
+   double            entryPrice; //入场价格
+   double            stopPrice; //原始止损
+   double            moveStopPrice; //移动止盈/止损
+   double            profitRatio; //盈亏比
+   bool              isWin; //是否盈利
+   datetime          entryTime; //入场时间
+   double            lot; //开仓数量
+  };
+//入参
+input double StopLimit= 100.00;    // 最大止损金额
+input int StopPoint= 10;    // 止损加点数
+input int  StopType=1;   //止盈方式,1:固定止盈(价格达到本周期布林带上下轨),2:移动止盈/止损(达到固定止盈条件后,将止损设置为本周期布林带上下轨),3:主周期移动止盈/止损(主周期均线多空头转换止盈,只在跟随主周期趋势开仓有效)
+input int OpenDeviateByMa=0; //开单条件过滤:开单价格偏离最近的均线最大点数,0为不过滤(例:开多单,开单价格必须小于最大周期均线+偏离量,超过则放弃开单)
+input bool FollowMainMaSequence=false; //开单条件过滤:是否跟主周期均线排列相同才开单,true:是,false:否
+input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主均线周期,默认:天
+//---
+int    ExtHandleMa40=0;
+int    ExtHandleMa50=0;
+int    ExtHandleMa60=0;
+int    ExtHandleMa70=0;
+int    ExtHandleMa80=0;
+int    ExtHandleBands=0;
+int    ExtHandleRsi=0;
+//大周期均线
+int    ExtHandleMainMa50=0;
+int    ExtHandleMainMa60=0;
+int    ExtHandleMainMa70=0;
+bool   IsCrossing=false;   //判断K线是否正在穿过布林带
+bool   IsCrossed=false;    //判断k线是否已经穿过布林带
+bool   IsPostioned=false;  //是否已开仓
+int    CrossMaSequence=0;  //出现穿过布林带时的多头空头状态,1:多头,-1:空头
+double ContractSize=0;     //标准合约大小
+double SymbolPoint=0;      //交易品种点值
+uint   Serial=0;           //交易序号
+int    AccountId=0;        //交易账号
+bool   IsRealAccount=false;//是否真实账户,true:是,false:否
+double OpenStopPrice=0;  //开仓时需要设置止损的K线对应价格,用于设置止损
+string GlobalSerialName=""; //保存序号的全局变量名称
 
-# 显示所有列
-pd.set_option('display.max_columns', None)
-# 显示所有行
-pd.set_option('display.max_rows', None)
+bool   ExtHedging=false;
+CTrade ExtTrade;
+TradeInfo tradeInfo;
 
+#define MA_MAGIC 39518605
 
-# 策略回测
-def backtesting_ma_bolling(kdata : pd.DataFrame, beginTime=None, endTime=None, tradeDirection=0):
-    """
-    根据均线排列和布林带回测策略
-    入参
-    code:股票代码，6位数字代码，此参数不可为空;
-    name:股票名称
-    beginTime:开始日期（包含），格式“%Y-%m-%d”；
-    endTime:结束日期（包含），格式“%Y-%m-%d”；
-    tradeDirection:交易方向,0:双向,1:只做多,2:只做空
-    """
-    # 获取均线排列跟布林带数据
-    kdata.index = pd.DatetimeIndex(kdata['日期'])
-    calc.df_ema(kdata, field='收盘', ma_list=ma_list)
-    calc.df_bolling(kdata, field='收盘')
-    # 筛选时间范围
-    if beginTime is not None:
-        beginT = datetime.strptime(beginTime, "%Y-%m-%d")
-        kdata = kdata[kdata.index >= pd.Timestamp(beginT)]
-    if endTime is not None:
-        endT = datetime.strptime(endTime, "%Y-%m-%d")
-        kdata = kdata[kdata.index <= pd.Timestamp(endT)]
-    # 交易详情列表,包括进场日期,进场方向,进场价格,止损位置,出场日期,出场价格,持有天数,盈亏比
-    trading_list = []
+//+------------------------------------------------------------------+
+//| Calculate optimal lot size                                       |
+//+------------------------------------------------------------------+
+double TradeSizeOptimized(void)
+  {
+   int leverrage=AccountInfoInteger(ACCOUNT_LEVERAGE);
+   double openPrice=NormalizeDouble(tradeInfo.entryPrice, Digits());
+   double stopPrice=NormalizeDouble(tradeInfo.stopPrice, Digits());
+//--- 计算仓位
+   double lot=0;
+//USD在后面的直盘:EURUSD
+   if(StringFind(_Symbol,"USD") > 0)
+     {
+      lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize),2);
+     }
+//USD在前面的直盘:USDJPY
+   else
+      if(StringFind(_Symbol,"USD") == 0)
+        {
+         lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize/openPrice),2);
+        }
+      //交叉盘:NZDJPY
+      else
+         if(StringFind(_Symbol,"USD") <= 0)
+           {
+            string symbol=StringSubstr(_Symbol,0,3)+"USD";
+            MqlTick tick;
+            SymbolInfoTick(symbol, tick);
+            double tickask=NormalizeDouble(tick.ask,SymbolInfoInteger(symbol,SYMBOL_DIGITS));
+            lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize*tickask/openPrice),2);
+           }
+//边界检查
+   double minvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN);
+   if(lot<minvol)
+      lot=minvol;
 
-    # 判断是否均线多头
-    isHigher = False
-    isLower = False
-    # 正在布林带上
-    isCrossing = False
-    # 是否发生了穿过布林带
-    isCrossed = False
-    # 出现穿过布林带时的多头空头状态,1:多头,-1:空头
-    crossMaSequence = 0
-    # 发生穿过布林带后,价格偏离过大(离开了布林带,是否能进场交易,0:不进场,1:进场)
-    crossDeviateTrade = 1
+   double maxvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MAX);
+   if(lot>maxvol)
+      lot=maxvol;
+//--- return trading volume
+   return(lot);
+  }
 
-    currentPosition = {'holding': False}
-    for index in kdata.index:
-        row = kdata.loc[index]
-        # 当前是否有持仓,有持仓判断出场,无持仓判断入场
-        if currentPosition['holding'] is True:
-            # 判断出场条件, 做多判断触碰布林上轨,做空判断触碰布林下轨
-            if currentPosition['direction'] == 'buy':
-                # 触碰上轨,以上轨价格平仓
-                if row['最低'] <= row['higher_bound'] <= row['最高']:
-                    currentPosition['outDate'] = row['日期']
-                    currentPosition['outPrice'] = row['higher_bound']
-                    profitRatio = round((currentPosition['outPrice'] - currentPosition['entryPrice']) / (currentPosition['entryPrice'] - currentPosition['stop']),2)
-                    currentPosition['profitRatio'] = profitRatio
-                    currentPosition['isWin'] = True
-                    isCrossing = False
-                    isCrossed = False
-                    isHigher = False
-                    isLower = False
-                    crossMaSequence = 0
-                    trading_list.append(currentPosition)
-                    currentPosition = {'holding': False}
-                # 止损
-                elif row['最低'] < currentPosition['stop']:
-                    currentPosition['outDate'] = row['日期']
-                    currentPosition['outPrice'] = currentPosition['stop']
-                    currentPosition['profitRatio'] = -1
-                    currentPosition['isWin'] = False
-                    isCrossing = False
-                    isCrossed = False
-                    isHigher = False
-                    isLower = False
-                    crossMaSequence = 0
-                    trading_list.append(currentPosition)
-                    currentPosition = {'holding': False}
-            elif currentPosition['direction'] == 'sell':
-                # 触碰下轨,以下轨价格平仓
-                if row['最低'] <= row['lower_bound'] <= row['最高']:
-                    currentPosition['outDate'] = row['日期']
-                    currentPosition['outPrice'] = row['lower_bound']
-                    profitRatio = round((currentPosition['entryPrice'] - currentPosition['outPrice']) / (currentPosition['stop'] - currentPosition['entryPrice']),2)
-                    currentPosition['profitRatio'] = profitRatio
-                    currentPosition['isWin'] = True
-                    isCrossing = False
-                    isCrossed = False
-                    isHigher = False
-                    isLower = False
-                    crossMaSequence = 0
-                    trading_list.append(currentPosition)
-                    currentPosition = {'holding': False}
-                # 止损
-                elif row['最高'] > currentPosition['stop']:
-                    currentPosition['outDate'] = row['日期']
-                    currentPosition['outPrice'] = currentPosition['stop']
-                    currentPosition['profitRatio'] = -1
-                    currentPosition['isWin'] = False
-                    isCrossing = False
-                    isCrossed = False
-                    isHigher = False
-                    isLower = False
-                    crossMaSequence = 0
-                    trading_list.append(currentPosition)
-                    currentPosition = {'holding': False}
-        # 止损K可以作为信号K
-        if currentPosition['holding'] is False:
-        # 止损K不可以作为信号K
-        # else:
-            # 判断是否满足入场条件
-            # 1.均线多头或者空头排列
-            maSequence = calc.calc_ma_sequence(row, ma_list, 'ema')
-            if (tradeDirection == 0 or tradeDirection == 2) and maSequence == -1:
-                isLower = True
-                isHigher = False
-            if (tradeDirection == 0 or tradeDirection == 1) and maSequence == 1:
-                isHigher = True
-                isLower = False
-            if maSequence == 0:
-                isHigher = False
-                isLower = False
-            # 2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
-            if isCrossed is False:
-                # 穿过布林带,可能为入场位,记录下止损价
-                if isLower:
-                    # 判断上穿布林带
-                    if row['最低'] <= row['higher_bound'] <= row['最高']:
-                        isCrossing = True
-                        currentPosition['stop'] = row['最高']
-                        isCrossed = True
-                        crossMaSequence = -1
-                if isHigher:
-                    # 判断下穿布林带
-                    if row['最低'] <= row['lower_bound'] <= row['最高']:
-                        isCrossing = True
-                        currentPosition['stop'] = row['最低']
-                        isCrossed = True
-                        crossMaSequence = 1
-            # 3.如果已经出现穿越,则看当前是否是收出了阳线(做多)或者阴线(做空),符合条件就进场
-            # 进场条件为多头排列时,价格下穿布林带下轨后收出回到布林带中第一个阳线,空头排列时,价格上
-            # 穿布林带上轨后收出回到布林带中第一个阴线
-            # 信号K可以作为入场K
-            if isCrossed is True:
-            # 信号K不可以作为入场K
-            # else:
-                # 出现了穿过布林带,判断当前是否还是正在布林带上,如果在,更新止损价格,如果回到布林带上并收反向K线进场,如果完全偏离出布林带放弃这次
-                if isLower and isCrossing:
-                    # 如果多空头方向变了,则放弃
-                    if crossMaSequence != -1:
-                        isCrossing = False
-                        currentPosition['stop'] = 0
-                        isCrossed = False
-                        crossMaSequence = 0
-                    # K线最低价比布林带高,意思是离开了布林带,放弃
-                    if crossDeviateTrade == 0 and row['最低'] > row['higher_bound']:
-                        isCrossing = False
-                        currentPosition['stop'] = 0
-                        isCrossed = False
-                        crossMaSequence = 0
-                    else:
-                        # 只要收出阴线进场,阳线继续更新止损价
-                        if row['开盘'] <= row['收盘']:
-                            currentPosition['stop'] = max(row['最高'], currentPosition['stop'])
-                        if row['开盘'] > row['收盘']:
-                            # 如果收盘穿过了布林中轨,止损过大,放弃
-                            if row['收盘'] > row['mid_bound']:
-                                currentPosition['stop'] = max(row['最高'], currentPosition['stop'])
-                                currentPosition['holding'] = True
-                                currentPosition['entryPrice'] = row['收盘']
-                                currentPosition['direction'] = 'sell'
-                                currentPosition['entryDate'] = row['日期']
-                            else:
-                                isCrossing = False
-                                currentPosition['stop'] = 0
-                                isCrossed = False
-                                crossMaSequence = 0
-                if isHigher and isCrossing:
-                    # 如果多空头方向变了,则放弃
-                    if crossMaSequence != 1:
-                        isCrossing = False
-                        currentPosition['stop'] = 0
-                        isCrossed = False
-                        crossMaSequence = 0
-                    # K线最高价比布林带低,意思是离开了布林带,放弃
-                    if crossDeviateTrade == 0 and row['最高'] < row['lower_bound']:
-                        isCrossing = False
-                        currentPosition['stop'] = 0
-                        isCrossed = False
-                        crossMaSequence = 0
-                    else:
-                        # 只要收出阳线进场,阴线继续更新止损价
-                        if row['开盘'] >= row['收盘']:
-                            currentPosition['stop'] = min(row['最低'], currentPosition['stop'])
-                        if row['开盘'] < row['收盘']:
-                            # 如果收盘穿过了布林中轨,止损过大,放弃
-                            if row['收盘'] < row['mid_bound']:
-                                currentPosition['stop'] = min(row['最低'], currentPosition['stop'])
-                                currentPosition['holding'] = True
-                                currentPosition['entryPrice'] = row['收盘']
-                                currentPosition['direction'] = 'buy'
-                                currentPosition['entryDate'] = row['日期']
-                            else:
-                                isCrossing = False
-                                currentPosition['stop'] = 0
-                                isCrossed = False
-                                crossMaSequence = 0
-    # 计算总的交易频率跟胜率
-    outResult = {}
-    if(len(trading_list) <= 0):
-        return outResult
-    result = pd.DataFrame(trading_list)
-    # 总交易次数
-    outResult['trade_times'] = len(result)
-    # 盈利次数
-    outResult['win_times'] = len(result[result['isWin'] == True])
-    # 亏损次数
-    outResult['lose_times'] = len(result[result['isWin'] == False])
-    # 总盈利(盈亏比)
-    outResult['profit_ratio'] = round(result['profitRatio'].sum(), 4)
-    # 胜率
-    outResult['win_chance'] = round(outResult['win_times']/outResult['trade_times'] * 100, 4)
-    # 交易频率
-    outResult['average_ransaction_requency'] = round(((kdata.tail(1).index - kdata.head(1).index).days / outResult['trade_times']).values[0], 4)
-    # 做多次数
-    outResult['buy_times'] = len(result[result['direction'] == 'buy'])
-    # 做多盈利次数
-    outResult['buy_win_times'] = len(result[(result['isWin'] == True) & (result['direction'] == 'buy')])
-    # 做多亏损次数
-    outResult['buy_lose_times'] = len(result[(result['isWin'] == False) & (result['direction'] == 'buy')])
-    # 做空次数
-    outResult['sell_times'] = len(result[result['direction'] == 'sell'])
-    # 做空盈利次数
-    outResult['sell_win_times'] = len(result[(result['isWin'] == True) & (result['direction'] == 'sell')])
-    # 做空亏损次数
-    outResult['sell_lose_times'] = len(result[(result['isWin'] == False) & (result['direction'] == 'sell')])
-    # 最大连续亏损次数
-    outResult['max_continuous_lose'] = calc.calc_field_value_times(result, 'isWin', False)
+//格式化TradeInfo价格位数
+void FormatTradeInfo()
+  {
+   if(tradeInfo.entryPrice!=NULL)
+     {
+      tradeInfo.entryPrice=NormalizeDouble(tradeInfo.entryPrice,Digits());
+     }
+   if(tradeInfo.outPrice!=NULL)
+     {
+      tradeInfo.outPrice=NormalizeDouble(tradeInfo.outPrice,Digits());
+     }
+   if(tradeInfo.stopPrice!=NULL)
+     {
+      tradeInfo.stopPrice=NormalizeDouble(tradeInfo.stopPrice,Digits());
+     }
+   if(tradeInfo.moveStopPrice!=NULL)
+     {
+      tradeInfo.moveStopPrice=NormalizeDouble(tradeInfo.moveStopPrice,Digits());
+     }
+   if(tradeInfo.profitRatio!=NULL)
+     {
+      tradeInfo.profitRatio=NormalizeDouble(tradeInfo.profitRatio,2);
+     }
+  }
+//+------------------------------------------------------------------+
+//| Check for open position conditions                               |
+//+------------------------------------------------------------------+
+void CheckForOpen(void)
+  {
+   if(IsPostioned==true)
+     {
+      return;
+     }
+//获取当前K线数据
+   MqlRates rt[2];
+//--- go trading only for first ticks of new bar
+   if(CopyRates(_Symbol,_Period,0,2,rt)!=2)
+     {
+      Print("CopyRates of ",_Symbol," failed, no history");
+      return;
+     }
+   if(rt[1].tick_volume>1)
+      return;
+   MqlRates current=rt[0];
+//测试时间用断点
+   if(current.time==StringToTime("2022.01.28 00:00:00"))
+     {
+      printf("进入断点");
+     }
+//--- 获取均线组数据判断趋势
+   double   ma40[2];
+   if(CopyBuffer(ExtHandleMa40,0,0,2,ma40)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma50[2];
+   if(CopyBuffer(ExtHandleMa50,0,0,2,ma50)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma60[2];
+   if(CopyBuffer(ExtHandleMa60,0,0,2,ma60)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma70[2];
+   if(CopyBuffer(ExtHandleMa70,0,0,2,ma70)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma80[2];
+   if(CopyBuffer(ExtHandleMa80,0,0,2,ma80)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   bandsMid[2];
+   if(CopyBuffer(ExtHandleBands,0,0,2,bandsMid)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandsUpper[2];
+   if(CopyBuffer(ExtHandleBands,1,0,2,bandsUpper)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandslower[2];
+   if(CopyBuffer(ExtHandleBands,2,0,2,bandslower)!=2)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+   double   mainMa50[2];
+   if(CopyBuffer(ExtHandleMainMa50,0,0,2,mainMa50)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa60[2];
+   if(CopyBuffer(ExtHandleMainMa60,0,0,2,mainMa60)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa70[2];
+   if(CopyBuffer(ExtHandleMainMa70,0,0,2,mainMa70)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+//--- 检查是否开仓
+   bool signal=false;
+   ENUM_ORDER_TYPE direction=WRONG_VALUE; //开仓方向
+//1.均线多头或者空头排列
+   double maxMa=ma70[0];
+   double ma[]= {ma50[0],ma60[0],ma70[0]};
+//double ma[]= {ma40[0],ma50[0],ma60[0],ma70[0],ma80[0]};
+   int maSequence=CalcMaSequence(ma);
+//大周期均线排列
+   double mainMa[]= {mainMa50[0],mainMa60[0],mainMa70[0]};
+   int mainMaSequence=CalcMaSequence(mainMa);
+//周期共振条件判断
+   if(FollowMainMaSequence==true && maSequence!=mainMaSequence)
+     {
+      return;
+     }
+   if(maSequence==-1)
+      direction=ORDER_TYPE_SELL;    // sell conditions
+   else
+      if(maSequence==1)
+        {
+         direction=ORDER_TYPE_BUY;  // buy conditions
+        }
+//2.如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
+   if(IsCrossed==false)
+     {
+      if(direction==ORDER_TYPE_SELL)
+        {
+         if(current.low <= bandsUpper[0] && bandsUpper[0]<=current.high)
+           {
+            IsCrossed=true;
+            IsCrossing=true;
+            OpenStopPrice=current.high;
+            CrossMaSequence=-1;
+           }
+        }
+      if(direction==ORDER_TYPE_BUY)
+        {
+         if(current.low<= bandslower[0] && bandslower[0]<=current.high)
+           {
+            IsCrossed=true;
+            IsCrossing=true;
+            OpenStopPrice=current.low;
+            CrossMaSequence=1;
+           }
+        }
+     }
+//3.如果已经出现穿越,则看当前是否是收出了阳线(做多)或者阴线(做空),符合条件就进场
+//进场条件为多头排列时,价格下穿布林带下轨后收出回到布林带中第一个阳线,空头排列时,价格上
+//穿布林带上轨后收出回到布林带中第一个阴线
+   if(IsCrossed==true)
+     {
+      //出现了穿过布林带,判断当前是否还是正在布林带上,如果在,更新止损价格,如果回到布林带上并收反向K线进场,如果完全偏离出布林带放弃这次
+      if(direction==ORDER_TYPE_SELL && IsCrossing)
+        {
+         //如果多空头方向变了,则放弃
+         if(CrossMaSequence!=-1)
+           {
+            ResetState();
+           }
+         //K线最低价比布林带高,意思是离开了布林带,放弃
+         //if(current.low>bandsUpper[0])
+         //  {
+         //   IsCrossed=false;
+         //   IsCrossing=false;
+         //   tradeInfo.stopPrice=0;
+         //   CrossMaSequence=0;
+         //   OpenStopPrice=0;
+         //  }
+         else
+           {
+            //只要收出阴线且阴线没有穿过布林带中线进场,阳线继续更新止损价
+            if(current.open<=current.close)
+              {
+               OpenStopPrice=fmax(current.high, OpenStopPrice);
+              }
+            if(current.open>current.close)
+              {
+               if(current.close>bandsMid[0])
+                 {
+                  if(OpenDeviateByMa==0 || current.close<maxMa+(SymbolPoint*OpenDeviateByMa))
+                    {
+                     OpenStopPrice=fmax(current.high, OpenStopPrice);
+                     tradeInfo.stopPrice=OpenStopPrice+(StopPoint*SymbolPoint);
+                     tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+                     tradeInfo.entryPrice=current.close;
+                     tradeInfo.lot=TradeSizeOptimized();
+                     tradeInfo.direction=2;
+                     tradeInfo.entryTime=TimeLocal();
+                     signal=true;
+                    }
+                  else
+                    {
+                     ResetState();
+                    }
+                 }
+               else
+                 {
+                  ResetState();
+                 }
+              }
+           }
+        }
+      if(direction==ORDER_TYPE_BUY && IsCrossing)
+        {
+         //如果多空头方向变了,则放弃
+         if(CrossMaSequence!=1)
+           {
+            ResetState();
+           }
+         //K线最高价比布林带低,意思是离开了布林带,放弃
+         //if(current.high<bandslower[0])
+         //  {
+         //   IsCrossed=false;
+         //   IsCrossing=false;
+         //   tradeInfo.stopPrice=0;
+         //   CrossMaSequence=0;
+         //   OpenStopPrice=0;
+         //  }
+         else
+           {
+            //只要收出阳线且阳线没有穿过布林带中线进场,阴线继续更新止损价
+            if(current.open>=current.close)
+              {
+               OpenStopPrice=fmin(current.low, OpenStopPrice);
+              }
+            if(current.open<current.close)
+              {
+               if(current.close<bandsMid[0])
+                 {
+                  if(OpenDeviateByMa==0 || current.close>maxMa-(SymbolPoint*OpenDeviateByMa))
+                    {
+                     OpenStopPrice=fmin(current.low, OpenStopPrice);
+                     tradeInfo.stopPrice=OpenStopPrice-(StopPoint*SymbolPoint);
+                     tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+                     tradeInfo.entryPrice=current.close;
+                     tradeInfo.direction=1;
+                     tradeInfo.lot=TradeSizeOptimized();
+                     tradeInfo.entryTime=TimeLocal();
+                     signal=true;
+                    }
+                  else
+                    {
+                     ResetState();
+                    }
+                 }
+               else
+                 {
+                  ResetState();
+                 }
+              }
+           }
+        }
+     }
+//--- 开仓
+   if(direction!=WRONG_VALUE && signal)
+     {
+      if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && Bars(_Symbol,_Period)>100)
+        {
+         FormatTradeInfo();
+         Serial=Serial+1;
+         //循环开仓,确保开成功
+         int i=1;
+         do
+           {
+            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),tradeInfo.stopPrice,0,IntegerToString(Serial));
+            Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("品种:%s_%s,编号:%d,第%d次开仓,开仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE)
+              {
+               break;
+              }
+            if(i>20)
+              {
+               //开仓失败,发送邮件
+               string text=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
+               printf(text);
+               string title=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               //开仓失败重置状态,之后重新判断进场
+               ResetState();
+               return;
+              }
+           }
+         while(i<=20);
 
-    # 输出数据处理
-    result = result.rename(columns={"entryDate": "entryTime", "stop": "stopPrice", "outDate":"outTime"})
-    result['profitRatioCumsum'] = result['profitRatio'].cumsum()
-    result['holdingTime'] = pd.to_datetime(result['outTime']) - pd.to_datetime(result['entryTime'])
-    result['holdingDays'] = result['holdingTime'].map(lambda x: x.days)
-    result['holdingHours'] = result['holdingTime'].map(lambda x: x.seconds/3600)
-    result.drop('holding', axis='columns', inplace=True)
-    result.drop('subgroup', axis='columns', inplace=True)
-    result.drop('holdingTime', axis='columns', inplace=True)
-    result = result.loc[:, ['entryPrice','direction','stopPrice','outPrice','isWin','profitRatio','profitRatioCumsum','entryTime','outTime','holdingDays','holdingHours']]
-    outResult['trade_list'] = result
-    return outResult
+         string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
+         printf(text);
+         //发送开仓邮件
+         string title=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         SendMail(title, text);
+         //发送开仓通知
+         SendNotification(text);
+         //开仓成功后需要把状态重置
+         ResetState();
+         //更新全局变量
+         GlobalVariableSet(GlobalSerialName, Serial);
+         GlobalVariablesFlush();
+        }
+     }
+//---
+  }
+//+------------------------------------------------------------------+
+//|重置入场状态                                                      |
+//+------------------------------------------------------------------+
+void ResetState()
+  {
+   IsCrossed=false;
+   IsCrossing=false;
+   CrossMaSequence=0;
+   OpenStopPrice=0;
+  }
+//判断均线多头还是空头
+int CalcMaSequence(double &ma[])
+  {
+//判断是否有值
+   for(int i=0; i<ArraySize(ma)-1; i++)
+     {
+      if(ma[i]==0)
+        {
+         return 0;
+        }
+     }
+//判断是否均线多头
+   bool isHigher=true;
+   for(int i=0; i<ArraySize(ma)-2; i++)
+     {
+      if(ma[i]<=ma[i+1])
+        {
+         isHigher=false;
+         break;
+        }
+     }
+   if(isHigher)
+     {
+      return 1;
+     }
+//判断是否均线空头
+   bool isLower=true;
+   for(int i=0; i<ArraySize(ma)-2; i++)
+     {
+      if(ma[i]>=ma[i+1])
+        {
+         isLower=false;
+         break;
+        }
+     }
+   if(isLower)
+     {
+      return -1;
+     }
+   return 0;
+  }
+//+------------------------------------------------------------------+
+//| Check for close position conditions                              |
+//+------------------------------------------------------------------+
+void CheckForClose(void)
+  {
+   if(IsPostioned==false)
+     {
+      return;
+     }
+//--- 获取布林带数据
+   double   bandsMid[1];
+   if(CopyBuffer(ExtHandleBands,0,0,1,bandsMid)!=1)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandsUpper[1];
+   if(CopyBuffer(ExtHandleBands,1,0,1,bandsUpper)!=1)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandslower[1];
+   if(CopyBuffer(ExtHandleBands,2,0,1,bandslower)!=1)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+   double   mainMa50[2];
+   if(CopyBuffer(ExtHandleMainMa50,0,0,2,mainMa50)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa60[2];
+   if(CopyBuffer(ExtHandleMainMa60,0,0,2,mainMa60)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa70[2];
+   if(CopyBuffer(ExtHandleMainMa70,0,0,2,mainMa70)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+//获取当前报价
+   MqlTick tick;
+   if(!SymbolInfoTick(_Symbol, tick))
+     {
+      Print("SymbolInfoTick of ",_Symbol," failed, no tick");
+      return;
+     }
+//测试时间用断点
+   if(tick.time==StringToTime("2022.01.28 10:00:00"))
+     {
+      printf("进入断点");
+     }
+//获取当前K线数据
+   MqlRates rt[1];
+//--- go trading only for first ticks of new bar
+   if(CopyRates(_Symbol,_Period,0,1,rt)!=1)
+     {
+      Print("CopyRates of ",_Symbol," failed, no history");
+      return;
+     }
+   MqlRates current=rt[0];
+//--- 判断是否需要平仓
+   bool signal=false;
+//判断出场条件, 做多判断触碰布林上轨,做空判断触碰布林下轨
+   if(tradeInfo.direction==1)
+     {
+      double bid=SymbolInfoDouble(_Symbol,SYMBOL_BID);
+      //判断止损
+      if(bid<=tradeInfo.stopPrice)
+        {
+         tradeInfo.outTime=TimeLocal();
+         tradeInfo.outPrice=tradeInfo.stopPrice;
+         tradeInfo.profitRatio=-1;
+         tradeInfo.isWin=false;
+         signal=true;
+        }
+      if(!signal)
+        {
+         //判断止盈
+         if(StopType==1)
+           {
+            //触碰上轨,以上轨价格平仓
+            if(bid>=bandsUpper[0] || (current.low<=bandsUpper[0]&&bandsUpper[0]<=current.high))
+              {
+               tradeInfo.outTime=TimeLocal();
+               tradeInfo.outPrice=bandsUpper[0];
+               tradeInfo.profitRatio=(tradeInfo.outPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+               tradeInfo.isWin=true;
+               signal=true;
+              }
+           }
+         else
+            if(StopType==2)
+              {
+               //触碰上轨,调整移动止损位置到布林下轨
+               if(bid>=bandsUpper[0] || (current.low<=bandsUpper[0]&&bandsUpper[0]<=current.high))
+                 {
+                  tradeInfo.moveStopPrice=bandslower[0]-(StopPoint*SymbolPoint);
+                 }
+               //移动止损跟原始止损不一致,说明开始趋势追踪,每次更新移动止损到下轨
+               if(tradeInfo.moveStopPrice!=tradeInfo.stopPrice)
+                 {
+                  tradeInfo.moveStopPrice=bandslower[0]-(StopPoint*SymbolPoint);
+                 }
+               //止损(移动止损,有可能止盈)
+               if(bid<=tradeInfo.moveStopPrice)
+                 {
+                  tradeInfo.outTime=TimeLocal();
+                  tradeInfo.outPrice=tradeInfo.moveStopPrice;
+                  //判断是否盈利
+                  if(tradeInfo.moveStopPrice>=tradeInfo.entryPrice)
+                    {
+                     tradeInfo.isWin=true;
+                     tradeInfo.profitRatio=(tradeInfo.moveStopPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+                    }
+                  else
+                    {
+                     tradeInfo.isWin=false;
+                     tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.moveStopPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+                    }
+                  signal=true;
+                 }
+              }
+            else
+               if(StopType==3)
+                 {
+                  //大周期均线排列
+                  double mainMa[]= {mainMa50[0],mainMa60[0],mainMa70[0]};
+                  int mainMaSequence=CalcMaSequence(mainMa);
+                  //大周期趋势变为空头排列平仓
+                  if(mainMaSequence==-1)
+                    {
+                     tradeInfo.outTime=TimeLocal();
+                     tradeInfo.outPrice=bid;
+                     tradeInfo.profitRatio=(tradeInfo.outPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+                     tradeInfo.isWin=true;
+                     signal=true;
+                    }
+                 }
+        }
+     }
+   else
+      if(tradeInfo.direction==2)
+        {
+         double ask=SymbolInfoDouble(_Symbol,SYMBOL_ASK);
+         //判断止损
+         if(ask>=tradeInfo.stopPrice)
+           {
+            tradeInfo.outTime=TimeLocal();
+            tradeInfo.outPrice=tradeInfo.stopPrice;
+            tradeInfo.profitRatio=-1;
+            tradeInfo.isWin=false;
+            signal=true;
+           }
+         if(!signal)
+           {
+            if(StopType==1)
+              {
+               //触碰下轨,以下轨价格平仓
+               if(ask<=bandslower[0] || (current.low<=bandslower[0]&&bandslower[0]<=current.high))
+                 {
+                  tradeInfo.outTime=TimeLocal();
+                  tradeInfo.outPrice=bandslower[0];
+                  tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.outPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+                  tradeInfo.isWin=true;
+                  signal=true;
+                 }
+              }
+            else
+               if(StopType==2)
+                 {
+                  //触碰下轨,调整移动止损位置到布林上轨
+                  if(ask<=bandslower[0] || (current.low<=bandslower[0]&&bandslower[0]<=current.high))
+                    {
+                     tradeInfo.moveStopPrice=bandsUpper[0]+(StopPoint*SymbolPoint);
+                    }
+                  //移动止损跟原始止损不一致,说明开始趋势追踪,每次更新移动止损到上轨
+                  if(tradeInfo.moveStopPrice!=tradeInfo.stopPrice)
+                    {
+                     tradeInfo.moveStopPrice=bandsUpper[0]+(StopPoint*SymbolPoint);
+                    }
+                  //止损(移动止损,有可能止盈)
+                  if(ask>=tradeInfo.moveStopPrice)
+                    {
+                     tradeInfo.outTime=TimeLocal();
+                     tradeInfo.outPrice=tradeInfo.moveStopPrice;
+                     //判断是否盈利
+                     if(tradeInfo.moveStopPrice<=tradeInfo.entryPrice)
+                       {
+                        tradeInfo.isWin=true;
+                        tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.moveStopPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+                       }
+                     else
+                       {
+                        tradeInfo.isWin=false;
+                        tradeInfo.profitRatio=(tradeInfo.moveStopPrice-tradeInfo.entryPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+                       }
+                     signal=true;
+                    }
+                 }
+               else
+                  if(StopType==3)
+                    {
+                     //大周期均线排列
+                     double mainMa[]= {mainMa50[0],mainMa60[0],mainMa70[0]};
+                     int mainMaSequence=CalcMaSequence(mainMa);
+                     //大周期趋势变为多头排列平仓
+                     if(mainMaSequence==1)
+                       {
+                        tradeInfo.outTime=TimeLocal();
+                        tradeInfo.outPrice=ask;
+                        tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.outPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+                        tradeInfo.isWin=true;
+                        signal=true;
+                       }
+                    }
+           }
+        }
+//--- 平仓
+   if(signal)
+     {
+      if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && Bars(_Symbol,_Period)>100)
+        {
+         FormatTradeInfo();
+         //循环平仓,确保平掉
+         int i=1;
+         do
+           {
+            ExtTrade.PositionClose(_Symbol);
+            Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("品种:%s_%s,编号:%d,第%d次平仓,平仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE||retCode==TRADE_RETCODE_POSITION_CLOSED)
+              {
+               break;
+              }
+            if(i>20)
+              {
+               //平仓失败,发送邮件
+               string text=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
+               printf(text);
+               string title=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               return;
+              }
+           }
+         while(i<=20);
+         //发送平仓邮件
+         string text=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%.2f,是否盈利:%s,平仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
+                                  tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin?"是":"否",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS));
+         printf(text);
+         //发送平仓邮件
+         string title=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         SendMail(title, text);
+         //发送平仓通知
+         SendNotification(text);
+        }
+     }
+//---
+  }
+//错误代码翻译
+string transReturnCode(uint returnCode)
+  {
+   if(returnCode==TRADE_RETCODE_NO_MONEY)
+     {
+      return "资金(保证金)不足";
+     }
+   if(returnCode==TRADE_RETCODE_POSITION_CLOSED)
+     {
+      return "持仓已关闭";
+     }
+   if(returnCode==TRADE_RETCODE_MARKET_CLOSED)
+     {
+      return "收市";
+     }
+   if(returnCode==TRADE_RETCODE_REQUOTE)
+     {
+      return "重新报价";
+     }
+   if(returnCode==TRADE_RETCODE_CONNECTION)
+     {
+      return "与服务器无连接";
+     }
+   if(returnCode==TRADE_RETCODE_LIMIT_ORDERS)
+     {
+      return "待办订单数量达到限制";
+     }
+   if(returnCode==TRADE_RETCODE_REJECT)
+     {
+      return "拒绝请求";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID)
+     {
+      return "无效请求";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_VOLUME)
+     {
+      return "无效成交量";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_PRICE)
+     {
+      return "无效价格";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_STOPS)
+     {
+      return "无效止损价";
+     }
+   if(returnCode==TRADE_RETCODE_TRADE_DISABLED)
+     {
+      return "关闭交易";
+     }
+   if(returnCode==TRADE_RETCODE_TOO_MANY_REQUESTS)
+     {
+      return "太频繁的请求";
+     }
+   return "未知错误";
+  }
+//+------------------------------------------------------------------+
+//| Position select depending on netting or hedging                  |
+//+------------------------------------------------------------------+
+bool SelectPosition()
+  {
+   bool res=false;
+//--- check position in Hedging mode
+   if(ExtHedging)
+     {
+      uint total=PositionsTotal();
+      for(uint i=0; i<total; i++)
+        {
+         string position_symbol=PositionGetSymbol(i);
+         if(_Symbol==position_symbol && MA_MAGIC==PositionGetInteger(POSITION_MAGIC))
+           {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
+            res=true;
+            break;
+           }
+        }
+     }
+//--- check position in Netting mode
+   else
+     {
+      if(!PositionSelect(_Symbol))
+         return(false);
+      else
+         if(PositionGetInteger(POSITION_MAGIC)==MA_MAGIC) //---check Magic number
+           {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
+            return true;
+           }
+      return(false);
+     }
+//--- result for Hedging mode
+   return(res);
+  }
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit(void)
+  {
+//--- prepare trade class to control positions if hedging mode is active
+   ExtHedging=((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE)==ACCOUNT_MARGIN_MODE_RETAIL_HEDGING);
+   ExtTrade.SetExpertMagicNumber(MA_MAGIC);
+   ExtTrade.SetMarginMode();
+   ExtTrade.SetTypeFillingBySymbol(Symbol());
+   ContractSize=SymbolInfoDouble(_Symbol,SYMBOL_TRADE_CONTRACT_SIZE);
+   SymbolPoint=SymbolInfoDouble(_Symbol,SYMBOL_POINT);
+   AccountId=AccountInfoInteger(ACCOUNT_LOGIN);
+   IsRealAccount=AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_REAL;
+//初始化数据
+//--- 均线跟布林带指标加载
+   ExtHandleMa40=iMA(_Symbol,_Period,40,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa50=iMA(_Symbol,_Period,50,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa60=iMA(_Symbol,_Period,60,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa70=iMA(_Symbol,_Period,70,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa80=iMA(_Symbol,_Period,80,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleBands=iBands(_Symbol,_Period,20,0,2,PRICE_CLOSE);
+   ExtHandleRsi=iRSI(_Symbol,_Period,14,PRICE_CLOSE);
+//大周期均线
+   ExtHandleMainMa50=iMA(_Symbol,MainTimeFrames,50,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa60=iMA(_Symbol,MainTimeFrames,60,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa70=iMA(_Symbol,MainTimeFrames,70,0,MODE_EMA,PRICE_CLOSE);
+//加载全局序号
+   GlobalSerialName=StringFormat("%s_%s_%d_Serial",_Symbol,StringSubstr(EnumToString(_Period),7),MA_MAGIC);
+   if(GlobalVariableCheck(GlobalSerialName))
+   {
+      Serial=GlobalVariableGet(GlobalSerialName);
+   }
+//是否有仓位
+   IsPostioned=SelectPosition();
+//--- ok
+   return(INIT_SUCCEEDED);
+  }
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick(void)
+  {
+//---
+   IsPostioned=SelectPosition();
+   if(IsPostioned)
+      CheckForClose();
+   else
+      CheckForOpen();
+//---
+  }
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+  }
+//+------------------------------------------------------------------+
 
+//+------------------------------------------------------------------+
+//| Trade function                                                   |
+//+------------------------------------------------------------------+
+void OnTrade()
+  {
+//---
 
-# 保存策略数据
-def save_testing_data(out : {}, code, name='', beginTime=None, endTime=None, excelFileName:str=None):
-    if bool(out):
-        stdout = '''代码:{}, 名称:{}, 总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(code, name, out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
-        logger.info('[' + code + ']' + name + '统计结果:' + stdout)
-        # logger.info('[' + code + ']' + name + '交易明细:')
-        # logger.info(out['trade_list'])
-        # 写入文件
-        sheetname = code
-        if beginTime is None:
-            sheetname = sheetname + '_none'
-        else:
-            sheetname = sheetname + '_' + beginTime
-        if endTime is None:
-            sheetname = sheetname + '_none'
-        else:
-            sheetname = sheetname + '_' + endTime 
-        # file = open(os.path.join(scons.ma_bolling_path, sheetname +'_summary.txt'), 'w')
-        # file.write(stdout)
-        # file.close()
-        # out['trade_list'].to_csv(os.path.join(scons.ma_bolling_path, sheetname + ".csv"), encoding="utf-8", index=False)
-        saveFileName=''
-        ws = None
-        if excelFileName is None:
-            saveFileName = os.path.join(scons.ma_bolling_path, sheetname + ".xlsx")
-        else:
-            saveFileName = excelFileName
-        #如果文件不存在,先创建
-        if os.path.exists(saveFileName) == False:
-            wb = Workbook()
-            ws = wb.active
-            ws.title=sheetname
-            wb.save(saveFileName)
-            wb = load_workbook(saveFileName)
-            ws = wb.get_sheet_by_name(sheetname)
-        else:
-            wb = load_workbook(saveFileName)
-            ws = wb.create_sheet(sheetname)
-        # 写入统计信息
-        ws.cell(row=1, column=2,value='代码')
-        ws.cell(row=1, column=3,value=code)
-        ws.cell(row=1, column=4,value='名称')
-        ws.cell(row=1, column=5,value=name)
-        ws.cell(row=1, column=6,value='总盈利(盈亏比)')
-        ws.cell(row=1, column=7,value=out['profit_ratio'])
-        ws.cell(row=2, column=2,value='总交易次数')
-        ws.cell(row=2, column=3,value=out['trade_times'])
-        ws.cell(row=2, column=4,value='盈利次数')
-        ws.cell(row=2, column=5,value=out['win_times'])
-        ws.cell(row=2, column=6,value='亏损次数')
-        ws.cell(row=2, column=7,value=out['lose_times'])
-        ws.cell(row=3, column=2,value='总胜率')
-        ws.cell(row=3, column=3,value=out['win_chance'])
-        ws.cell(row=3, column=4,value='交易频率(天)')
-        ws.cell(row=3, column=5,value=out['average_ransaction_requency'])
-        ws.cell(row=3, column=6,value='最大连续亏损次数')
-        ws.cell(row=3, column=7,value=out['max_continuous_lose'])
-        ws.cell(row=4, column=2,value='多单次数')
-        ws.cell(row=4, column=3,value=out['buy_times'])
-        ws.cell(row=4, column=4,value='多单盈利次数')
-        ws.cell(row=4, column=5,value=out['buy_win_times'])
-        ws.cell(row=4, column=6,value='多单亏损次数')
-        ws.cell(row=4, column=7,value=out['buy_lose_times'])
-        ws.cell(row=5, column=2,value='空单次数')
-        ws.cell(row=5, column=3,value=out['sell_times'])
-        ws.cell(row=5, column=4,value='空单盈利次数')
-        ws.cell(row=5, column=5,value=out['sell_win_times'])
-        ws.cell(row=5, column=6,value='空单亏损次数')
-        ws.cell(row=5, column=7,value=out['sell_lose_times'])
+  }
+//+------------------------------------------------------------------+
+//| TradeTransaction function                                        |
+//+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction& trans,
+                        const MqlTradeRequest& request,
+                        const MqlTradeResult& result)
+  {
+//---
 
-        # 写入交易明细
-        ws.append([])
-        for r in dataframe_to_rows(out['trade_list'], index=True, header=True):
-            if len(r) <= 1:
-                continue
-            ws.append(r)
-        
-        # 绘制总盈利(盈亏比)图
-        scatter_chart = ScatterChart()
-        # 设置标题
-        scatter_chart.title = '总盈利(盈亏比)曲线'
-        # 设置颜色
-        scatter_chart.style = 13
-        # 设置x轴y轴标题
-        scatter_chart.x_axis.tickLblPos = 'low'
-        scatter_chart.width = 30
-        scatter_chart.height = 15
-        scatter_chart.legend = None
-        scatter_chart.x_axis.title = '时间'
-        scatter_chart.y_axis.title = '总盈利(盈亏比)'
-        
-        # 创建x轴的数据来源
-        xvalues = Reference(ws, min_col=10, min_row=8, max_row=8 + len(out['trade_list']))
-        # 创建yvalues
-        yvalues = Reference(ws, min_col=8, min_row=7, max_row=7 + len(out['trade_list']))
-        series = Series(yvalues, xvalues=xvalues, title_from_data=True)
-        scatter_chart.series.append(series)
-        # 将散点图添加到ws工作表中
-        ws.add_chart(scatter_chart, 'N1')
-        wb.save(saveFileName)
-
-
-# 单个外汇回测
-def backtesting_forex(code, cycle, name='', beginTime=None, endTime=None, tradeDirection=0, excelFileName:str=None):
-    """
-    外汇回测
-    入参
-    code:外汇代码,大写
-    cycle:外汇周期(H1, H4, D1)
-    beginTime:开始日期（包含），格式“%Y-%m-%d”
-    endTime:结束日期（包含），格式“%Y-%m-%d”
-    tradeDirection:交易方向,0:双向,1:只做多,2:只做空
-    """
-    filename = code + '_' + cycle
-    logger.info('[' + filename + ']' + '回测开始')
-    file_name = os.path.join(ccons.forex_history_path, filename+".csv")
-    exist = os.path.exists(file_name)
-    if not exist:
-        logger.info(file_name + '数据文件不存在.回测结束')
-        return
-    kdata = pd.read_csv(file_name, sep=r'\t')
-    # 表头格式化
-    if cycle == 'D1':
-        kdata = kdata.rename(columns={"<DATE>": "日期"})
-    else:
-        kdata['日期'] = pd.to_datetime(kdata.apply(lambda x: str(x['<DATE>']) + " " + str(x['<TIME>']), axis=1), format="%Y.%m.%d %H:%M:%S")
-    kdata['日期'] = pd.to_datetime(kdata['日期'])
-    kdata = kdata.rename(columns={"<OPEN>":"开盘", "<HIGH>":"最高", "<LOW>":"最低", "<CLOSE>":"收盘"})
-    out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
-    save_testing_data(out, filename, name, beginTime=beginTime, endTime=endTime, excelFileName=excelFileName)
-    logger.info('[' + filename + ']' + '回测结束')
-    out['code'] = filename
-    out['name'] = name
-    return out
-
-
-# 所有外汇回测
-def backtesting_all_forex(code:[]=[], cycle:[]=['D1'], beginTime=None, endTime=None, tradeDirection=0):
-    basic = pd.read_csv(ccons.forex_basic_file, dtype={'代码': str})
-    summaryList = []
-    # 先创建excel文件
-    filename = os.path.join(scons.ma_bolling_path, 'all_forex_summary_' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
-    for index in basic.index:
-        row = basic.loc[index, :]
-        s_code = row['代码']
-        name = row['名称']
-        if len(code) > 0 and s_code not in code:
-            continue
-        for cyc in cycle:
-            try:
-                out = backtesting_forex(s_code, cyc, name, beginTime, endTime, tradeDirection, filename)
-                if bool(out):
-                    # stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
-                    # logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
-                    # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
-                    # logger.info(out['trade_list'])
-                    del out['trade_list']
-                    summaryList.append(out)
-            except BaseException:
-                logger.error(str(s_code) + ':回测失败,原因:' + traceback.format_exc())
-    summary = pd.DataFrame(summaryList)
-    summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
-    logger.info(summaryOut)
-    # file = open(os.path.join(scons.ma_bolling_path, 'all_forex_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
-    # file.write(summaryOut)
-    # file.close()
-    # summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_forex_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
-    # 保存excel
-    wb = load_workbook(filename)
-    ws = wb.create_sheet('all_forex_summary', 0)
-    # 写入统计明细
-    for r in dataframe_to_rows(summary, index=True, header=True):
-        if len(r) <= 1:
-            continue
-        ws.append(r)
-    # 统计信息
-    maxRow = ws.max_row
-    ws['A'+str(maxRow+1)].value = "总计"
-    ws['B'+str(maxRow+1)].value = "=SUM(B2:B"+str(maxRow)+")"
-    ws['C'+str(maxRow+1)].value = "=SUM(C2:C"+str(maxRow)+")"
-    ws['D'+str(maxRow+1)].value = "=SUM(D2:D"+str(maxRow)+")"
-    ws['E'+str(maxRow+1)].value = "=SUM(E2:E"+str(maxRow)+")"
-    ws['F'+str(maxRow+1)].value = "=C"+str(maxRow+1)+"/B"+str(maxRow+1)+"*100"
-    wb.save(filename)
-
-
-# 单个股票回测
-def backtesting_stock(code, name='', beginTime=None, endTime=None, tradeDirection=0, excelFileName:str=None):
-    logger.info('[' + code + ']' + name + '回测开始')
-    file_name = os.path.join(ccons.stock_history_path, code+".csv")
-    exist = os.path.exists(file_name)
-    if not exist:
-        logger.info(file_name + '数据文件不存在.回测结束')
-        return
-    kdata = pd.read_csv(file_name)
-    # 格式化日期
-    kdata['日期'] = pd.to_datetime(kdata.apply(lambda x: str(x['日期']), axis=1), format="%Y-%m-%d")
-    kdata['日期'] = kdata['日期'].dt.strftime('%Y-%m-%d %H:%M:%S')
-    out = backtesting_ma_bolling(kdata, beginTime, endTime, tradeDirection)
-    save_testing_data(out, code, name, beginTime=beginTime, endTime=endTime, excelFileName=excelFileName)
-    logger.info('[' + code + ']' + name + '回测结束')
-    out['code'] = code
-    out['name'] = name
-    return out
-
-
-# 所有股票回测
-def backtesting_all_stock(beginTime=None, endTime=None, tradeDirection=0):
-    basic = pd.read_csv(ccons.stock_basic_file, dtype={'代码': str})
-    summaryList = []
-    # 先创建excel文件
-    filename = os.path.join(scons.ma_bolling_path, 'all_stock_summary_' + datetime.now().strftime('%Y%m%d%H%M%S') + '.xlsx')
-    for index in basic.index:
-        row = basic.loc[index, :]
-        s_code = row['代码']
-        name = row['名称']
-        try:
-            out = backtesting_stock(s_code, name, beginTime, endTime, tradeDirection)
-            if bool(out):
-                # stdout = '''总交易次数:{}, 盈利次数:{}, 亏损次数:{}, 总盈利(盈亏比):{}, 总胜率:{}%, 交易频率:{}/天, 多单次数:{}, 多单盈利次数:{}, 多单亏损次数:{}, 空单次数:{}, 空单盈利次数:{}, 空单亏损次数:{},最大连续亏损次数:{}.'''.format(out['trade_times'], out['win_times'], out['lose_times'], out['profit_ratio'], out['win_chance'], out['average_ransaction_requency'], out['buy_times'], out['buy_win_times'], out['buy_lose_times'], out['sell_times'], out['sell_win_times'], out['sell_lose_times'], out['max_continuous_lose'])
-                # logger.info('[' + out['code'] + ']' + out['name'] + '回测完成,统计结果:' + stdout)
-                # logger.info('[' + out['code'] + ']' + out['name'] + '交易明细:')
-                # logger.info(out['trade_list'])
-                del out['trade_list']
-                summaryList.append(out)
-        except BaseException:
-            logger.error(str(s_code) + ':回测失败,原因:' + traceback.format_exc())
-    summary = pd.DataFrame(summaryList)
-    summaryOut = '''总计,交易次数:{}, 盈利次数:{}, 亏损次数:{},  总盈利(盈亏比):{}, 总胜率:{}%'''.format(summary['trade_times'].sum(), summary['win_times'].sum(), summary['lose_times'].sum(), summary['profit_ratio'].sum(), round(summary['win_times'].sum()/summary['trade_times'].sum() * 100, 4))
-    logger.info(summaryOut)
-    # file = open(os.path.join(scons.ma_bolling_path, 'all_stock_summary' + datetime.now().strftime('%Y%m%d%H%M%S') + '.txt'), 'w')
-    # file.write(summaryOut)
-    # file.close()
-    # summary.to_csv(os.path.join(scons.ma_bolling_path, 'all_stock_summary_list' + datetime.now().strftime('%Y%m%d%H%M%S') + '.csv'), encoding="utf-8", index=False)
-    # 保存excel
-    wb = load_workbook(filename)
-    ws = wb.create_sheet('all_stock_summary', 0)
-    # 写入统计明细
-    for r in dataframe_to_rows(summary, index=True, header=True):
-        if len(r) <= 1:
-            continue
-        ws.append(r)
-    # 统计信息
-    maxRow = ws.max_row
-    ws['A'+str(maxRow+1)].value = "总计"
-    ws['B'+str(maxRow+1)].value = "=SUM(B2:B"+str(maxRow)+")"
-    ws['C'+str(maxRow+1)].value = "=SUM(C2:C"+str(maxRow)+")"
-    ws['D'+str(maxRow+1)].value = "=SUM(D2:D"+str(maxRow)+")"
-    ws['E'+str(maxRow+1)].value = "=SUM(E2:E"+str(maxRow)+")"
-    ws['F'+str(maxRow+1)].value = "=C"+str(maxRow+1)+"/B"+str(maxRow+1)+"*100"
-    wb.save(filename)
-
-
-if __name__ == '__main__':
-    # backtesting_all_stock(tradeDirection=1)
-    # backtesting_stock('000002', '万科A')
-    # backtesting_forex('EURUSD','H1', beginTime='2007-01-01', endTime='2023-09-20')
-    backtesting_all_forex(code=[],cycle=['H1'],beginTime='2008-01-01', endTime='2008-12-31')
+  }
+//+------------------------------------------------------------------+
