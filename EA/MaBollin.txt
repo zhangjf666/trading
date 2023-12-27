@@ -26,10 +26,11 @@ struct TradeInfo
 //入参
 input double StopLimit= 100.00;    // 最大止损金额
 input int StopPoint= 10;    // 止损加点数
-input int  StopType=1;   //止盈方式,1:固定止盈(价格达到本周期布林带上下轨),2:移动止盈/止损(达到固定止盈条件后,将止损设置为本周期布林带上下轨),3:主周期移动止盈/止损(主周期均线多空头转换止盈,只在跟随主周期趋势开仓有效)
+input int  StopType=1;   //止盈方式,1:固定止盈(价格达到本周期布林带上下轨),2:移动止盈/止损(达到固定止盈条件后,将止损设置为本周期布林带上下轨),3:主周期移动止盈/止损(主周期均线多空头转换止盈/或者是达到stopWinProfitRatio倍盈亏比止盈,只在跟随主周期趋势开仓有效)
 input int OpenDeviateByMa=0; //开单条件过滤:开单价格偏离最近的均线最大点数,0为不过滤(例:开多单,开单价格必须小于最大周期均线+偏离量,超过则放弃开单)
 input bool FollowMainMaSequence=false; //开单条件过滤:是否跟主周期均线排列相同才开单,true:是,false:否
 input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主均线周期,默认:天
+input double stopWinProfitRatio=10; //止盈方式为3时,止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
 //---
 int    ExtHandleMa40=0;
 int    ExtHandleMa50=0;
@@ -597,11 +598,13 @@ void CheckForClose(void)
             else
                if(StopType==3)
                  {
+                  //实时盈亏比
+                  double profitRatio = (bid-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
                   //大周期均线排列
                   double mainMa[]= {mainMa50[0],mainMa60[0],mainMa70[0]};
                   int mainMaSequence=CalcMaSequence(mainMa);
                   //大周期趋势变为空头排列平仓
-                  if(mainMaSequence==-1)
+                  if(mainMaSequence==-1 || (stopWinProfitRatio != 0 && profitRatio >= stopWinProfitRatio))
                     {
                      tradeInfo.outTime=TimeLocal();
                      tradeInfo.outPrice=bid;
@@ -674,11 +677,13 @@ void CheckForClose(void)
                else
                   if(StopType==3)
                     {
+                     //实时盈亏比
+                     double profitRatio = (tradeInfo.entryPrice-ask)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
                      //大周期均线排列
                      double mainMa[]= {mainMa50[0],mainMa60[0],mainMa70[0]};
                      int mainMaSequence=CalcMaSequence(mainMa);
                      //大周期趋势变为多头排列平仓
-                     if(mainMaSequence==1)
+                     if(mainMaSequence==1 || (stopWinProfitRatio != 0 && profitRatio >= stopWinProfitRatio))
                        {
                         tradeInfo.outTime=TimeLocal();
                         tradeInfo.outPrice=ask;
