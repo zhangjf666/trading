@@ -19,6 +19,7 @@ struct TradeInfo
    double            stopPrice; //原始止损
    double            moveStopPrice; //移动止损
    double            profitRatio; //盈亏比
+   double            maxProfitRatio; //持仓达到的最大盈亏比
    bool              isWin; //是否盈利
    datetime          entryTime; //入场时间
    double            lot; //开仓数量
@@ -29,9 +30,11 @@ input int StopPoint=80;    // 止损加点数
 input int StopPointEffectiveRange=0; //计算止损时判断止损点的有效范围:止损点附近最高到最低的范围太小的话,不算作最低点
 input bool FollowMainMaSequence=false; //开单条件过滤:是否跟主周期均线排列相同才开单,true:是,false:否
 input bool IsBreakOutUseTradeTimeFrame=true; //判断突破条件成立时是使用交易周期还是主周期,true:交易周期,false:主周期
+input bool FollowMainFrameTrend=true; //突破趋势方向是否需要跟主周期一致,true:需要,false:不需要
 input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主均线周期,默认:天
 input double ProfitProtectionRate=2; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位,默认为2倍盈亏比
 input double StopWinProfitRatio=10; //主动止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
+input int ZigzagPointCount=9; //判断高点低点时选取的zigzag极值点个数
 //本周期均线
 int    ExtHandleMa35=0;
 int    ExtHandleMa40=0;
@@ -256,12 +259,13 @@ void CheckForOpen(void)
       return;
      }
 //均线方向,1:多头,只做多,2:空头,只做空
-   if(maSequence==-1)
+   int trendDirection = FollowMainFrameTrend?mainMaSequence:maSequence;
+   if(trendDirection==-1)
      {
       direction=ORDER_TYPE_SELL;    // sell conditions
      }
    else
-      if(maSequence==1)
+      if(trendDirection==1)
         {
          direction=ORDER_TYPE_BUY;  // buy conditions
         }
@@ -281,6 +285,7 @@ void CheckForOpen(void)
    tradeInfo.stopPrice=CalaStopPrice(direction);
    tradeInfo.moveStopPrice=tradeInfo.stopPrice;
    tradeInfo.lot=TradeSizeOptimized();
+   tradeInfo.maxProfitRatio=0.0;
    tradeInfo.entryTime=TimeLocal();
 //--- 开仓
    if(direction!=WRONG_VALUE && signal)
@@ -373,25 +378,29 @@ int CalcMaSequence(double &ma[])
 bool IsBreakoutZigzag(MqlTick &tick, int zigzagHandle, ENUM_ORDER_TYPE direction)
   {
    double   zigZag[];
-   SearchZigZagExtremums(3,zigZag,zigzagHandle);
-//最近极值高点和低点
-   double high=0.0,low=0.0;
-   double room_0 = zigZag[0];
-   double room_1 = zigZag[1];
-   double room_2 = zigZag[2];
-   if(room_1>room_2)
-     {
-      high=room_1;
-      low=room_2;
-     }
-   else
-     {
-      high=room_2;
-      low=room_1;
-     }
+   //获取zigzag的最近ZigzagPointCount个值,一般是n个高点n个低点
+   SearchZigZagExtremums(ZigzagPointCount,zigZag,zigzagHandle);
+   ArrayRemove(zigZag, 0, 1);
+   //找到最大值和最小值(不包含0)
+   double high=zigZag[0],low=zigZag[0];
+   for(int i=0;i<ArraySize(zigZag);i++)
+   {
+      if(high<zigZag[i])
+      {
+         high=zigZag[i];
+      }
+      if(low>zigZag[i] && zigZag[i] != 0.0)
+      {
+         low=zigZag[i];
+      }
+   }
+   if(high==0.0 || low==0.0)
+   {
+      return false;
+   }
    if(direction==ORDER_TYPE_BUY)
      {
-      if(tick.bid>high)
+      if(tick.bid>=high)
         {
          return true;
         }
@@ -399,7 +408,7 @@ bool IsBreakoutZigzag(MqlTick &tick, int zigzagHandle, ENUM_ORDER_TYPE direction
    else
       if(direction==ORDER_TYPE_SELL)
         {
-         if(tick.ask<low)
+         if(tick.ask<=low)
            {
             return true;
            }
@@ -625,15 +634,32 @@ void CheckForClose(void)
          tradeInfo.isWin=tradeInfo.entryPrice==tradeInfo.moveStopPrice?true:false;
          signal=true;
         }
-      //判断是否要推BE
-      if(tradeInfo.entryPrice!=tradeInfo.moveStopPrice)
-        {
-         //盈亏比大于了设定的盈亏比
-         if((bid-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice)>=ProfitProtectionRate)
+      //判断是否要推止损,当前盈亏比比持仓最大的盈亏比要大,说明可能需要推止损
+      double profitRatio = (bid-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+      if(profitRatio>tradeInfo.maxProfitRatio)
+      {
+         tradeInfo.maxProfitRatio=profitRatio;
+         //盈亏比大于1,止损缩减到原来的一半
+         if(profitRatio>=1)
+         {
+            tradeInfo.moveStopPrice=tradeInfo.entryPrice-(tradeInfo.entryPrice-tradeInfo.stopPrice)/2;
+         }
+         //盈亏比大于了设定的盈亏比,止损到入场点
+         if(profitRatio>=ProfitProtectionRate)
            {
             tradeInfo.moveStopPrice=tradeInfo.entryPrice;
            }
-        }
+         //盈亏比大于2,止损到入场点上半个盈亏比的位置,即赚0.5个盈亏比
+         //if(profitRatio>=2)
+         //{
+            //tradeInfo.moveStopPrice=tradeInfo.entryPrice+(tradeInfo.entryPrice-tradeInfo.stopPrice)/2;
+         //}
+         //盈亏比大于3,止损到入场点上一个盈亏比的位置,即赚1个盈亏比
+         //if(profitRatio>=3)
+         //{
+            //tradeInfo.moveStopPrice=tradeInfo.entryPrice+(tradeInfo.entryPrice-tradeInfo.stopPrice);
+         //}
+      }
       if(!signal)
         {
          //止盈
@@ -677,15 +703,32 @@ void CheckForClose(void)
             tradeInfo.isWin=tradeInfo.entryPrice==tradeInfo.moveStopPrice?true:false;
             signal=true;
            }
-         //判断是否要推BE
-         if(tradeInfo.entryPrice!=tradeInfo.moveStopPrice)
-           {
-            //盈亏比大于了设定的盈亏比
-            if((tradeInfo.entryPrice-ask)/(tradeInfo.stopPrice-tradeInfo.entryPrice)>=ProfitProtectionRate)
+         //判断是否要推止损,当前盈亏比比持仓最大的盈亏比要大,说明可能需要推止损
+         double profitRatio = (tradeInfo.entryPrice-ask)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+         if(profitRatio>tradeInfo.maxProfitRatio)
+         {
+            tradeInfo.maxProfitRatio=profitRatio;
+            //盈亏比大于1,止损缩减到原来的一半
+            if(profitRatio>=1)
+            {
+               tradeInfo.moveStopPrice=tradeInfo.entryPrice+(tradeInfo.stopPrice-tradeInfo.entryPrice)/2;
+            }
+            //盈亏比大于了设定的盈亏比,止损到入场点
+            if(profitRatio>=ProfitProtectionRate)
               {
                tradeInfo.moveStopPrice=tradeInfo.entryPrice;
               }
-           }
+            //盈亏比大于2,止损到入场点上半个盈亏比的位置,即赚0.5个盈亏比
+            //if(profitRatio>=2)
+            //{
+               //tradeInfo.moveStopPrice=tradeInfo.entryPrice-(tradeInfo.stopPrice-tradeInfo.entryPrice)/2;
+            //}
+            //盈亏比大于3,止损到入场点上一个盈亏比的位置,即赚1个盈亏比
+            //if(profitRatio>=3)
+            //{
+               //tradeInfo.moveStopPrice=tradeInfo.entryPrice-(tradeInfo.stopPrice-tradeInfo.entryPrice);
+            //}
+         }
          if(!signal)
            {
             //止盈
@@ -901,7 +944,6 @@ int OnInit(void)
    ExtHandleMa50=iMA(_Symbol,_Period,50,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMa60=iMA(_Symbol,_Period,60,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleBands=iBands(_Symbol,_Period,20,0,2,PRICE_CLOSE);
-   ExtHandleZigzag=iCustom(_Symbol,_Period,"Examples\\ZigZag");
 //大周期指标加载
    ExtHandleMainMa35=iMA(_Symbol,MainTimeFrames,35,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa40=iMA(_Symbol,MainTimeFrames,40,0,MODE_EMA,PRICE_CLOSE);
