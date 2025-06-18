@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                    Ma Bollin.mq5 |
+//|                                                RangeBreakOut.mq5 |
 //|                                 Copyright 2000-2023, Alex zhang. |
 //|                                             im.zhangjf@gmail.com |
 //+------------------------------------------------------------------+
@@ -32,11 +32,11 @@ input bool FollowMainMaSequence=false; //开单条件过滤:是否跟主周期�
 input bool IsBreakOutUseTradeTimeFrame=true; //判断突破条件成立时是使用交易周期还是主周期,true:交易周期,false:主周期
 input bool FollowMainFrameTrend=true; //突破趋势方向是否需要跟主周期一致,true:需要,false:不需要
 input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主均线周期,默认:天
-input double ProfitProtectionRate=2; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位,默认为2倍盈亏比
-input double StopWinProfitRatio=10; //主动止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
+input double ProfitProtectionRate=0.5; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位,默认为2倍盈亏比
+input double StopWinProfitRatio=1.5; //主动止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
 input int ZigzagPointCount=9; //判断高点低点时选取的zigzag极值点个数
-input double TradeRangeLowerPoint=20; //有效的交易区间最低点数
-input double TradeRangeHigherPoint=45; //有效的交易区间最高点数
+input double TradeRangeLowestPoint=200; //有效的交易区间最低点数
+input double TradeRangeHighestPoint=450; //有效的交易区间最高点数
 input int TradeRangeTimeBegin=0; //判定交易区间的开始时间(UTC时间)
 input int TradeRangeTimeEnd=4; //判定交易区间的结束时间(UTC时间)
 input int TradeTime=23; //可以进行交易的时间(UTC时间)
@@ -69,6 +69,8 @@ double TradeRangePoint=0;  //交易区间点数
 bool   IsTradeToday=false; //今天是否已经交易过,true:是,false:否
 double TradeRangeHighPrice=0;  //交易区间的上边界价格
 double TradeRangeLowPrice=0;   //交易区间的下边界价格
+int    DateOfToday=0;      //当前的日期,用于判断是否开始了新的一天
+bool   PrintDebug=false;   //输出调试
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -178,22 +180,34 @@ void CheckForOpen(void)
 //获取时间处理高低点,如果时间在交易框架内,更新高低点
    MqlDateTime mdt;
    TimeToStruct(current.time, mdt);
-   if(mdt.hour < TradeRangeTimeBegin)
+   //判断是否开始新的一天
+   if(mdt.day!=DateOfToday)
    {
-      return;
+      PrintDebug=true;
+      ResetTradeRange();
+      DateOfToday=mdt.day;
    }
    if(mdt.hour >= TradeRangeTimeBegin && mdt.hour < TradeRangeTimeEnd)
    {
-      IsTradeToday=false;
-      if(current.high > TradeRangeHighPrice)
+      if(TradeRangeHighPrice==0||current.high>TradeRangeHighPrice)
       {
          TradeRangeHighPrice=current.high;
       }
-      if(current.low < TradeRangeLowPrice)
+      if(TradeRangeLowPrice==0||current.low<TradeRangeLowPrice)
       {
          TradeRangeLowPrice=current.low;
       }
       TradeRangePoint=(TradeRangeHighPrice-TradeRangeLowPrice)/SymbolPoint;
+      return;
+   }
+//如果交易框架范围点位超过最小最大值,不进行交易
+   if(TradeRangePoint==0||TradeRangePoint<TradeRangeLowestPoint||TradeRangePoint>TradeRangeHighestPoint)
+   {
+      if(PrintDebug&&TradeRangePoint!=0)
+      {
+         printf("TradeRangePoint: %d,TradeRangeHighPrice: %d,TradeRangeLowPrice: %d,不能开仓",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
+         PrintDebug=false;
+      }
       return;
    }
 //如果今天已经交易过,不再开仓
@@ -354,6 +368,8 @@ void CheckForOpen(void)
 
          string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
+         //设置为当日已开仓
+         IsTradeToday=true;
          //发送开仓邮件
          string title=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
@@ -581,6 +597,14 @@ double CalaStopPrice(ENUM_ORDER_TYPE direction)
            }
      }
    return 0;
+  }
+//---重置判断条件
+void ResetTradeRange()
+  {
+     TradeRangeHighPrice=0;
+     TradeRangeLowPrice=0;
+     TradeRangePoint=0;
+     IsTradeToday=false;
   }
 //+------------------------------------------------------------------+
 //| Check for close position conditions                              |
