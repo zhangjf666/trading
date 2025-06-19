@@ -25,6 +25,8 @@ struct TradeInfo
    double            lot; //开仓数量
   };
 //入参
+input bool IsFixedLot=false; //是否使用固定开仓手数,true:是,将使用固定开仓手数参数开仓,false:否,将使用最大止损金额参数计算手数(保证每次开仓止损一样大)
+input double FixedOrderLot=1; //固定开仓手数
 input double StopLimit= 100.00;    // 最大止损金额
 input int StopPoint=80;    // 止损加点数
 input int StopPointEffectiveRange=0; //计算止损时判断止损点的有效范围:止损点附近最高到最低的范围太小的话,不算作最低点
@@ -66,11 +68,12 @@ int    AccountId=0;        //交易账号
 bool   IsRealAccount=false;//是否真实账户,true:是,false:否
 string GlobalSerialName="";//保存序号的全局变量名称
 double TradeRangePoint=0;  //交易区间点数
-bool   IsTradeToday=false; //今天是否已经交易过,true:是,false:否
+bool   IsTradeToday=false; //今天是否交易过,true:是,false:否
 double TradeRangeHighPrice=0;  //交易区间的上边界价格
 double TradeRangeLowPrice=0;   //交易区间的下边界价格
 int    DateOfToday=0;      //当前的日期,用于判断是否开始了新的一天
-bool   PrintDebug=false;   //输出调试
+bool   PrintRangePoint=false;   //输出RangePoint信息
+bool   PrintBreakEven=false;    //输出breakeven信息
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -183,7 +186,7 @@ void CheckForOpen(void)
    //判断是否开始新的一天
    if(mdt.day!=DateOfToday)
    {
-      PrintDebug=true;
+      PrintRangePoint=true;
       ResetTradeRange();
       DateOfToday=mdt.day;
    }
@@ -203,15 +206,15 @@ void CheckForOpen(void)
 //如果交易框架范围点位超过最小最大值,不进行交易
    if(TradeRangePoint==0||TradeRangePoint<TradeRangeLowestPoint||TradeRangePoint>TradeRangeHighestPoint)
    {
-      if(PrintDebug&&TradeRangePoint!=0)
+      if(PrintRangePoint&&TradeRangePoint!=0)
       {
-         printf("TradeRangePoint: %d,TradeRangeHighPrice: %d,TradeRangeLowPrice: %d,不能开仓",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
-         PrintDebug=false;
+         printf("TradeRangePoint: %f,TradeRangeHighPrice: %f,TradeRangeLowPrice: %f,未达到开仓条件",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
+         PrintRangePoint=false;
       }
       return;
    }
 //如果今天已经交易过,不再开仓
-   if(IsTradeToday==true)
+   if(IsTradeToday)
    {
       return;
    }
@@ -318,7 +321,7 @@ void CheckForOpen(void)
    double mainMa[]= {mainMa35[0],mainMa40[0],mainMa45[0],mainMa50[0],mainMa60[0]};
    int mainMaSequence=CalcMaSequence(mainMa);
 //是否跟主周期一致
-   if(FollowMainMaSequence==false||(direction==ORDER_TYPE_BUY&&mainMaSequence==1)||(direction==ORDER_TYPE_SELL&&mainMaSequence==-1))
+   if(FollowMainFrameTrend==false||(direction==ORDER_TYPE_BUY&&mainMaSequence==1)||(direction==ORDER_TYPE_SELL&&mainMaSequence==-1))
    {
       signal=true;
    }
@@ -331,7 +334,7 @@ void CheckForOpen(void)
    tradeInfo.entryPrice=direction==ORDER_TYPE_BUY?tick.ask:tick.bid;
    tradeInfo.stopPrice=direction==ORDER_TYPE_BUY?TradeRangeLowPrice:TradeRangeHighPrice;
    tradeInfo.moveStopPrice=tradeInfo.stopPrice;
-   tradeInfo.lot=TradeSizeOptimized();
+   tradeInfo.lot=IsFixedLot?FixedOrderLot:TradeSizeOptimized();
    tradeInfo.maxProfitRatio=0.0;
    tradeInfo.entryTime=TimeLocal();
 //--- 开仓
@@ -368,8 +371,10 @@ void CheckForOpen(void)
 
          string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
-         //设置为当日已开仓
+         //标记今天已经交易过
          IsTradeToday=true;
+         //打印推BE信息
+         PrintBreakEven=true;
          //发送开仓邮件
          string title=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
          SendMail(title, text);
@@ -700,6 +705,11 @@ void CheckForClose(void)
          if(profitRatio>=ProfitProtectionRate)
            {
             tradeInfo.moveStopPrice=tradeInfo.entryPrice;
+            if(PrintBreakEven)
+            {
+               printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
+               PrintBreakEven=false;
+            }
            }
       }
       if(!signal)
@@ -714,6 +724,7 @@ void CheckForClose(void)
             tradeInfo.profitRatio=profitRatio;
             tradeInfo.isWin=true;
             signal=true;
+            printf("Take Profit,盈亏比:%f,达到设定止盈盈亏比:%f,止盈价位:%f,盈利点数:%f", profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint));
            }
         }
      }
@@ -739,6 +750,11 @@ void CheckForClose(void)
             if(profitRatio>=ProfitProtectionRate)
               {
                tradeInfo.moveStopPrice=tradeInfo.entryPrice;
+               if(PrintBreakEven)
+               {
+                  printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
+                  PrintBreakEven=false;
+               }
               }
          }
          if(!signal)
@@ -753,6 +769,7 @@ void CheckForClose(void)
                tradeInfo.profitRatio=profitRatio;
                tradeInfo.isWin=true;
                signal=true;
+               printf("Take Profit,盈亏比:%f,达到设定止盈盈亏比:%f,止盈价位:%f,盈利点数:%f", profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint));
               }
            }
         }
