@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                RangeBreakOut.mq5 |
+//|                                                TBPriceAction.mq5 |
 //|                                 Copyright 2000-2023, Alex zhang. |
 //|                                             im.zhangjf@gmail.com |
 //+------------------------------------------------------------------+
@@ -32,30 +32,25 @@ input double FixedOrderLot=1; //固定开仓手数
 input double StopLimit= 100.00;    // 最大止损金额
 input int StopPoint=0;    // 止损加点数,在止损基础上增加的保护点数,只对初始止损有效
 input int StopPointEffectiveRange=0; //计算止损时判断止损点的有效范围:止损点附近最高到最低的范围太小的话,不算作最低点
-input bool FollowMainMaSequence=false; //开单条件过滤:是否跟主周期均线排列相同才开单,true:是,false:否
-input bool IsBreakOutUseTradeTimeFrame=true; //判断突破条件成立时是使用交易周期还是主周期,true:交易周期,false:主周期
 input bool FollowMainFrameTrend=true; //突破趋势方向是否需要跟主周期一致,true:需要,false:不需要
 input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主均线周期,默认:天
 input double ProfitProtectionRate=0.5; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位,0为不推BE
 input double StopWinProfitRatio=1; //主动止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
-input int ZigzagPointCount=9; //判断高点低点时选取的zigzag极值点个数
-input double TradeRangeLowestPoint=200; //有效的交易区间最低点数
-input double TradeRangeHighestPoint=850; //有效的交易区间最高点数
-input int TradeRangeTimeBegin=1; //判定交易区间的开始时间(交易服务器时间)
-input int TradeRangeTimeEnd=5; //判定交易区间的结束时间(交易服务器时间)
 input int NoTradeTimeBegin=-1; //不进行交易的时间起,包含(单位:hour,交易服务器时间),-1表示全部时间段都进行交易
 input int NoTradeTimeEnd=-1; //不进行交易的时间止,不包含(单位:hour交易服务器时间),-1表示全部时间段都进行交易
+input double EmaSubtracted=0; //过滤条件:20EMA跟220EMA相差的有效值,如果差值太小,说明可能是缠绕状态,过滤避免做单
+input double BodyFusesRatio=2; //过滤条件:突破最后一根蜡烛的烛身跟引线的比例,避免引线过长的情况
 
 //本周期均线
+int    ExtHandleMa20=0;
 int    ExtHandleMa35=0;
 int    ExtHandleMa40=0;
 int    ExtHandleMa45=0;
 int    ExtHandleMa50=0;
 int    ExtHandleMa60=0;
+int    ExtHandleMa220=0;
 //本周期布林带
 int    ExtHandleBands=0;
-//Zigzag指标
-int    ExtHandleZigzag=0;
 //大周期均线
 int    ExtHandleMainMa35=0;
 int    ExtHandleMainMa40=0;
@@ -70,13 +65,10 @@ uint   Serial=0;           //交易序号
 int    AccountId=0;        //交易账号
 bool   IsRealAccount=false;//是否真实账户,true:是,false:否
 string GlobalSerialName="";//保存序号的全局变量名称
-double TradeRangePoint=0;  //交易区间点数
-bool   IsTradeToday=false; //今天是否交易过,true:是,false:否
-double TradeRangeHighPrice=0;  //交易区间的上边界价格
-double TradeRangeLowPrice=0;   //交易区间的下边界价格
-int    DateOfToday=0;      //当前的日期,用于判断是否开始了新的一天
 bool   PrintRangePoint=false;   //输出RangePoint信息
 bool   PrintBreakEven=false;    //输出breakeven信息
+double TradeLowestPrice=0; //三根连续K线的最低价
+double TradeHighestPrice=0; //三根连续K线的最高价
 
 bool   ExtHedging=false;
 CTrade ExtTrade;
@@ -207,43 +199,13 @@ void CheckForOpen(void)
       return;
      }
 //测试时间用断点
-   if(current.time==StringToTime("2025.06.23 01:00:00"))
+   if(current.time==StringToTime("2022.01.28 00:00:00"))
      {
       printf("进入断点");
      }
-//获取时间处理高低点,如果时间在交易框架内,更新高低点
+//获取时间
    MqlDateTime mdt;
    TimeToStruct(current.time, mdt);
-//判断是否开始新的一天
-   if(mdt.day!=DateOfToday)
-     {
-      PrintRangePoint=true;
-      ResetTradeRange();
-      DateOfToday=mdt.day;
-     }
-   if(mdt.hour >= TradeRangeTimeBegin && mdt.hour < TradeRangeTimeEnd)
-     {
-      if(TradeRangeHighPrice==0||current.high>TradeRangeHighPrice)
-        {
-         TradeRangeHighPrice=current.high;
-        }
-      if(TradeRangeLowPrice==0||current.low<TradeRangeLowPrice)
-        {
-         TradeRangeLowPrice=current.low;
-        }
-      TradeRangePoint=(TradeRangeHighPrice-TradeRangeLowPrice)/SymbolPoint;
-      return;
-     }
-//如果交易框架范围点位超过最小最大值,不进行交易
-   if(TradeRangePoint==0||TradeRangePoint<TradeRangeLowestPoint||TradeRangePoint>TradeRangeHighestPoint)
-     {
-      if(PrintRangePoint&&TradeRangePoint!=0)
-        {
-         printf("TradeRangePoint: %f,TradeRangeHighPrice: %f,TradeRangeLowPrice: %f,未达到开仓条件",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
-         PrintRangePoint=false;
-        }
-      return;
-     }
 //如果在非交易时间范围内,不进行交易
    if(NoTradeTimeBegin!=-1&&NoTradeTimeEnd!=-1)
      {
@@ -279,11 +241,6 @@ void CheckForOpen(void)
                return;
               }
            }
-//如果今天已经交易过,不再开仓
-   if(IsTradeToday)
-     {
-      return;
-     }
 //--- 获取均线组数据判断趋势
    double   ma35[2];
    if(CopyBuffer(ExtHandleMa35,0,0,2,ma35)!=2)
@@ -366,21 +323,70 @@ void CheckForOpen(void)
 //--- 检查是否开仓
    bool signal=false;
    ENUM_ORDER_TYPE direction=WRONG_VALUE; //开仓方向
-//步骤一.判断是否突破,多头突破为1,空头突破为-1
-   if(current.close>TradeRangeHighPrice)
+//步骤一.判断做单方向
+//检查均线差值
+   double   ma20[2];
+   if(CopyBuffer(ExtHandleMa20,0,0,2,ma20)!=2)
      {
-      direction=ORDER_TYPE_BUY;  // buy conditions
+      Print("CopyBuffer from iMA failed, no data");
+      return;
      }
-   else
-      if(current.close<TradeRangeLowPrice)
-        {
-         direction=ORDER_TYPE_SELL;    // sell conditions
-        }
-   if(direction==WRONG_VALUE)
+   double   ma220[2];
+   if(CopyBuffer(ExtHandleMa220,0,0,2,ma220)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+//判断均线差值是否满足开仓条件
+   if(MathAbs(ma220[0]-ma20[0])/SymbolPoint<EmaSubtracted)
      {
       return;
      }
-//步骤二.判断是否需要跟主周期趋势方向一致
+//做单方向
+   direction=ma20[0]>ma220[0]?ORDER_TYPE_BUY:ORDER_TYPE_SELL;
+   if(direction==WRONG_VALUE)
+      return;
+//步骤二.判断前三根K线是否都为阳线或者都为阴线
+//获取前三根K线,判断是否都为阳线或阴线,需要跟做单方向一致,并且最后一跟K线需要超过20EMA,引线需要小于实体
+   MqlRates trendRt[4];
+   if(CopyRates(_Symbol,_Period,0,4,trendRt)!=4)
+     {
+      Print("CopyRates of ",_Symbol," failed, no history");
+      return;
+     }
+   MqlRates first=trendRt[0],second=trendRt[1],third=trendRt[2];
+   if(direction==ORDER_TYPE_BUY)
+     {
+      if(first.close<=first.open)
+         return;
+      if(second.close<=second.open)
+         return;
+      if(third.close<=third.open)
+         return;
+      if(third.close<=ma20[0])
+         return;
+      if((third.close-third.open)/(third.high-third.close)<BodyFusesRatio||(first.close-first.open)/(first.high-first.close)<BodyFusesRatio||(second.close-second.open)/(second.high-second.close)<BodyFusesRatio)
+         return;
+      TradeLowestPrice=MathMin(MathMin(first.low,second.low),third.low);
+      TradeHighestPrice=MathMax(MathMax(first.high,second.high),third.high);
+     }
+   else
+      if(direction==ORDER_TYPE_SELL)
+        {
+         if(first.close>=first.open)
+            return;
+         if(second.close>=second.open)
+            return;
+         if(third.close>=third.open)
+            return;
+         if(third.close>=ma20[0])
+            return;
+         if((third.open-third.close)/(third.close-third.low)<BodyFusesRatio||(first.open-first.close)/(first.close-first.low)<BodyFusesRatio||(second.open-second.close)/(second.close-second.low)<BodyFusesRatio)
+            return;
+         TradeLowestPrice=MathMin(MathMin(first.low,second.low),third.low);
+         TradeHighestPrice=MathMax(MathMax(first.high,second.high),third.high);
+        }
+//步骤三.判断是否需要跟主周期趋势方向一致
    double ma[]= {ma35[0],ma40[0],ma45[0],ma50[0],ma60[0]};
    int maSequence=CalcMaSequence(ma);
 //大周期均线排列
@@ -398,7 +404,7 @@ void CheckForOpen(void)
 //填充开仓信息
    tradeInfo.direction=direction==ORDER_TYPE_BUY?1:2;
    tradeInfo.entryPrice=direction==ORDER_TYPE_BUY?tick.ask:tick.bid;
-   tradeInfo.stopPrice=direction==ORDER_TYPE_BUY?TradeRangeLowPrice-(StopPoint*SymbolPoint):TradeRangeHighPrice+(StopPoint*SymbolPoint);
+   tradeInfo.stopPrice=direction==ORDER_TYPE_BUY?TradeLowestPrice-(StopPoint*SymbolPoint):TradeHighestPrice+(StopPoint*SymbolPoint);
    tradeInfo.moveStopPrice=tradeInfo.stopPrice;
    tradeInfo.lot=IsFixedLot?FixedOrderLot:TradeSizeOptimized();
    tradeInfo.maxProfitRatio=0.0;
@@ -437,8 +443,6 @@ void CheckForOpen(void)
 
          string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
          printf(text);
-         //标记今天已经交易过
-         IsTradeToday=true;
          //打印推BE信息
          PrintBreakEven=true;
          //发送开仓邮件
@@ -493,87 +497,6 @@ int CalcMaSequence(double &ma[])
       return -1;
      }
    return 0;
-  }
-//判断zigzag是否突破
-bool IsBreakoutZigzag(MqlTick &tick, int zigzagHandle, ENUM_ORDER_TYPE direction)
-  {
-   double   zigZag[];
-//获取zigzag的最近ZigzagPointCount个值,一般是n个高点n个低点
-   SearchZigZagExtremums(ZigzagPointCount,zigZag,zigzagHandle);
-   ArrayRemove(zigZag, 0, 1);
-//找到最大值和最小值(不包含0)
-   double high=zigZag[0],low=zigZag[0];
-   for(int i=0;i<ArraySize(zigZag);i++)
-     {
-      if(high<zigZag[i])
-        {
-         high=zigZag[i];
-        }
-      if(low>zigZag[i] && zigZag[i] != 0.0)
-        {
-         low=zigZag[i];
-        }
-     }
-   if(high==0.0 || low==0.0)
-     {
-      return false;
-     }
-   if(direction==ORDER_TYPE_BUY)
-     {
-      if(tick.bid>=high)
-        {
-         return true;
-        }
-     }
-   else
-      if(direction==ORDER_TYPE_SELL)
-        {
-         if(tick.ask<=low)
-           {
-            return true;
-           }
-        }
-   return false;
-  }
-//查找zigzag极值
-bool SearchZigZagExtremums(const int count,double &array_results[], int zigzagHandle)
-  {
-   if(!ArrayIsDynamic(array_results))
-     {
-      Print("This a no dynamic array!");
-      return(false);
-     }
-   ArrayFree(array_results);
-   ArrayResize(array_results,count);
-   ArraySetAsSeries(array_results,true);
-   int      buffer_num=0;           // indicator buffer number
-   double   arr_buffer[];
-   ArraySetAsSeries(arr_buffer,true);
-//--- reset error code
-   ResetLastError();
-//--- fill a part of the iCustom array with values from the indicator buffer
-   int copied=CopyBuffer(zigzagHandle,buffer_num,0,100,arr_buffer);
-   if(copied<0)
-     {
-      //--- if the copying fails, tell the error code
-      PrintFormat("Failed to copy data from the iCustom indicator, error code %d",GetLastError());
-      //--- quit with zero result - it means that the indicator is considered as not calculated
-      return(false);
-     }
-   int elements=0;
-   for(int i=0;i<copied;i++)
-     {
-      if(arr_buffer[i]!=0)
-        {
-         array_results[elements]=arr_buffer[i];
-         elements++;
-         if(elements==count)
-            break;
-        }
-     }
-   if(elements==count)
-      return(true);
-   return(false);
   }
 //计算K线最低点和最高点
 double CalaStopPrice(ENUM_ORDER_TYPE direction)
@@ -668,14 +591,6 @@ double CalaStopPrice(ENUM_ORDER_TYPE direction)
            }
      }
    return 0;
-  }
-//---重置判断条件
-void ResetTradeRange()
-  {
-   TradeRangeHighPrice=0;
-   TradeRangeLowPrice=0;
-   TradeRangePoint=0;
-   IsTradeToday=false;
   }
 //+------------------------------------------------------------------+
 //| Check for close position conditions                              |
@@ -772,9 +687,9 @@ void CheckForClose(void)
            {
             tradeInfo.moveStopPrice=tradeInfo.entryPrice;
             if(BreakEvenIncludeCommision)
-            {
+              {
                tradeInfo.moveStopPrice=tradeInfo.moveStopPrice+SymbolPointValue();
-            }
+              }
             if(PrintBreakEven)
               {
                printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
@@ -821,9 +736,9 @@ void CheckForClose(void)
               {
                tradeInfo.moveStopPrice=tradeInfo.entryPrice;
                if(BreakEvenIncludeCommision)
-               {
+                 {
                   tradeInfo.moveStopPrice=tradeInfo.moveStopPrice-SymbolPointValue();
-               }
+                 }
                if(PrintBreakEven)
                  {
                   printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
@@ -1032,21 +947,14 @@ int OnInit(void)
    ExtHandleMa50=iMA(_Symbol,_Period,50,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMa60=iMA(_Symbol,_Period,60,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleBands=iBands(_Symbol,_Period,20,0,2,PRICE_CLOSE);
+   ExtHandleMa20=iMA(_Symbol,_Period,20,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa220=iMA(_Symbol,_Period,220,0,MODE_EMA,PRICE_CLOSE);
 //大周期指标加载
    ExtHandleMainMa35=iMA(_Symbol,MainTimeFrames,35,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa40=iMA(_Symbol,MainTimeFrames,40,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa45=iMA(_Symbol,MainTimeFrames,45,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa50=iMA(_Symbol,MainTimeFrames,50,0,MODE_EMA,PRICE_CLOSE);
    ExtHandleMainMa60=iMA(_Symbol,MainTimeFrames,60,0,MODE_EMA,PRICE_CLOSE);
-//加载Zigzag指标
-   if(IsBreakOutUseTradeTimeFrame)
-     {
-      ExtHandleZigzag=iCustom(_Symbol,_Period,"Examples\\ZigZag");
-     }
-   else
-     {
-      ExtHandleZigzag=iCustom(_Symbol,MainTimeFrames,"Examples\\ZigZag");
-     }
 //加载全局序号
    GlobalSerialName=StringFormat("%s_%s_%d_Serial",_Symbol,StringSubstr(EnumToString(_Period),7),MA_MAGIC);
    if(GlobalVariableCheck(GlobalSerialName))
