@@ -75,6 +75,7 @@ bool   IsTradeToday=false; //今天是否交易过,true:是,false:否
 double TradeRangeHighPrice=0;  //交易区间的上边界价格
 double TradeRangeLowPrice=0;   //交易区间的下边界价格
 int    DateOfToday=0;      //当前的日期,用于判断是否开始了新的一天
+bool   RenewTradeRange=true; //是否需要更新交易区域,true:是,false:否
 bool   PrintRangePoint=false;   //输出RangePoint信息
 bool   PrintBreakEven=false;    //输出breakeven信息
 
@@ -207,32 +208,51 @@ void CheckForOpen(void)
       return;
      }
 //测试时间用断点
-   if(current.time==StringToTime("2025.06.23 01:00:00"))
+   if(current.time==StringToTime("2025.06.23 06:45:00"))
      {
       printf("进入断点");
      }
 //获取时间处理高低点,如果时间在交易框架内,更新高低点
    MqlDateTime mdt;
    TimeToStruct(current.time, mdt);
-//判断是否开始新的一天
+//判断是否开始新的一天,如果是新的一天,需要重新计算有效交易区域
    if(mdt.day!=DateOfToday)
      {
       PrintRangePoint=true;
       ResetTradeRange();
       DateOfToday=mdt.day;
+      RenewTradeRange=true;
      }
-   if(mdt.hour >= TradeRangeTimeBegin && mdt.hour < TradeRangeTimeEnd)
+   if(RenewTradeRange)
      {
-      if(TradeRangeHighPrice==0||current.high>TradeRangeHighPrice)
+      if(mdt.hour<TradeRangeTimeEnd)
         {
-         TradeRangeHighPrice=current.high;
+         return;
         }
-      if(TradeRangeLowPrice==0||current.low<TradeRangeLowPrice)
+      MqlRates candles[96];
+      if(CopyRates(_Symbol,PERIOD_M15,0,96,candles)!=96)
         {
-         TradeRangeLowPrice=current.low;
+         Print("CopyRates of ",_Symbol," failed, no history");
+         return;
         }
-      TradeRangePoint=(TradeRangeHighPrice-TradeRangeLowPrice)/SymbolPoint;
-      return;
+      for(int i=95;i>0;i--)
+        {
+         MqlDateTime candMdt;
+         TimeToStruct(candles[i].time,candMdt);
+         if(candMdt.hour >= TradeRangeTimeBegin && candMdt.hour < TradeRangeTimeEnd)
+           {
+            if(TradeRangeHighPrice==0||candles[i].high>TradeRangeHighPrice)
+              {
+               TradeRangeHighPrice=candles[i].high;
+              }
+            if(TradeRangeLowPrice==0||candles[i].low<TradeRangeLowPrice)
+              {
+               TradeRangeLowPrice=candles[i].low;
+              }
+            TradeRangePoint=(TradeRangeHighPrice-TradeRangeLowPrice)/SymbolPoint;
+           }
+        }
+        RenewTradeRange=false;
      }
 //如果交易框架范围点位超过最小最大值,不进行交易
    if(TradeRangePoint==0||TradeRangePoint<TradeRangeLowestPoint||TradeRangePoint>TradeRangeHighestPoint)
@@ -758,7 +778,7 @@ void CheckForClose(void)
         {
          tradeInfo.outTime=TimeLocal();
          tradeInfo.outPrice=tradeInfo.moveStopPrice;
-         tradeInfo.profitRatio=tradeInfo.entryPrice==tradeInfo.moveStopPrice?0:-1;
+         tradeInfo.profitRatio=tradeInfo.entryPrice<=tradeInfo.moveStopPrice?0:-1;
          tradeInfo.isWin=tradeInfo.entryPrice==tradeInfo.moveStopPrice?true:false;
          signal=true;
         }
@@ -772,9 +792,9 @@ void CheckForClose(void)
            {
             tradeInfo.moveStopPrice=tradeInfo.entryPrice;
             if(BreakEvenIncludeCommision)
-            {
+              {
                tradeInfo.moveStopPrice=tradeInfo.moveStopPrice+SymbolPointValue();
-            }
+              }
             if(PrintBreakEven)
               {
                printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
@@ -807,7 +827,7 @@ void CheckForClose(void)
            {
             tradeInfo.outTime=TimeLocal();
             tradeInfo.outPrice=tradeInfo.moveStopPrice;
-            tradeInfo.profitRatio=tradeInfo.entryPrice==tradeInfo.moveStopPrice?0:-1;
+            tradeInfo.profitRatio=tradeInfo.entryPrice>=tradeInfo.moveStopPrice?0:-1;
             tradeInfo.isWin=tradeInfo.entryPrice==tradeInfo.moveStopPrice?true:false;
             signal=true;
            }
@@ -821,9 +841,9 @@ void CheckForClose(void)
               {
                tradeInfo.moveStopPrice=tradeInfo.entryPrice;
                if(BreakEvenIncludeCommision)
-               {
+                 {
                   tradeInfo.moveStopPrice=tradeInfo.moveStopPrice-SymbolPointValue();
-               }
+                 }
                if(PrintBreakEven)
                  {
                   printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
