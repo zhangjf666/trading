@@ -1,0 +1,1050 @@
+//+------------------------------------------------------------------+
+//|                                               TrendFollowing.mq5 |
+//|                                                       alex zhang |
+//|                                             im.zhangjf@gmail.com |
+//+------------------------------------------------------------------+
+#property copyright "alex zhang"
+#property link      "im.zhangjf@gmail.com"
+#property version   "1.00"
+#include <Trade\Trade.mqh>
+
+//持仓结构
+struct TradeInfo
+  {
+   int               direction; //交易方向,1:买入,2:卖出
+   datetime          outTime; //出场时间
+   double            outPrice; //出场价格
+   double            entryPrice; //入场价格
+   double            stopPrice; //原始止损
+   double            moveStopPrice; //移动止盈/止损
+   double            profitRatio; //盈亏比
+   bool              isWin; //是否盈利
+   datetime          entryTime; //入场时间
+   double            lot; //开仓数量
+  };
+//入参
+input double StopLimit= 100.00;    // 最大止损金额
+input int StopPoint=10;    //止损加点数,在止损基础上增加的保护点数,只对初始止损有效
+input double MacdMinPoint=0; //MACD慢线跟快线相差的范围,表示上穿或者下穿的差值大于这个点数才算穿过,避免慢线跟快线纠缠的时候反复进场
+input double EntryBarMinPoint=30; //入场的K线实体最低点数,避免有些交易商不一致,造成误入,比如在某个交易显示商收了阳线,有些交易商显示为十字星或者阴线
+input bool FollowMainMaSequence=false; //开单条件过滤:是否macd交叉方向跟主周期均线排列相同才开单,true:是,false:否
+input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_D1; //主周期,默认:天
+input double MaxWinProfitRatio=25; //主动止盈最大盈亏比,达到该盈亏比时主动止盈,-1表示不主动止盈
+input bool CloseWithMidBands=false; //是否打布林带中轨止盈,true:是,false:否
+input int OutOfRangeBarCount=40; //在出现交易条件后多少根bar后取消交易,-1:表示不取消
+input double ProfitProtectionRate=0; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位置,0为不推BE
+input bool OpenTrendEnable=true; //主周期出现交易信号时,交易周期是否需要出现对应的多头空头趋势,true:需要,false:不需要
+input int MaxTradeTimePerCross=1; //主周期出现信号后,交易周期可以交易的最大次数,-1表示不限制
+//本周期指标
+int    ExtHandleMa30=0;
+int    ExtHandleMa35=0;
+int    ExtHandleMa40=0;
+int    ExtHandleMa45=0;
+int    ExtHandleMa50=0;
+int    ExtHandleBands=0;
+//大周期指标
+int    ExtHandleMainMa30=0;
+int    ExtHandleMainMa35=0;
+int    ExtHandleMainMa40=0;
+int    ExtHandleMainMa45=0;
+int    ExtHandleMainMa50=0;
+int    ExtHandleMainBands=0;
+int    ExtHandleMainMacd=0;
+int    ExtHandleMainAtr=0;
+//参数
+bool   IsCrossing=false;   //判断K线是否正在穿过布林带
+bool   IsCrossed=false;    //判断k线是否已经穿过布林带
+bool   IsPostioned=false;  //是否已开仓
+int    CrossMaSequence=0;  //出现穿过布林带时的多头空头状态,1:多头,-1:空头
+double OpenStopPrice=0;  //开仓时需要设置止损的K线对应价格,用于设置止损
+int    CrossState=0;   //表示当前是金叉还是死叉,-1:死叉,1:金叉
+int    CurrentOutOfRangeBarCount=0;  //当前主周期出现交易条件后经过的K线数量
+bool   IsOpenTrend=false; //主周期出现开仓条件后,交易周期是否出现过对应的趋势
+bool   CrossBandsOtherSide=false; //开仓后是否达到布林带的另一端
+int    TradeTimeInCurrentCross=0; //主周期出现交易信号后已经交易的次数
+bool   PrintBreakEven=false;    //输出breakeven信息
+//品种参数
+double ContractSize=0;     //标准合约大小
+double SymbolPoint=0;      //交易品种点值
+uint   Serial=0;           //交易序号
+int    AccountId=0;        //交易账号
+bool   IsRealAccount=false;//是否真实账户,true:是,false:否
+string GlobalSerialName=""; //保存序号的全局变量名称
+string StrategyName="TrendFollowing"; //策略名称
+bool   ExtHedging=false;
+CTrade ExtTrade;
+TradeInfo tradeInfo;
+
+#define MA_MAGIC 39518602
+
+//+------------------------------------------------------------------+
+//| Calculate optimal lot size                                       |
+//+------------------------------------------------------------------+
+//double TradeSizeOptimizedOld(void)
+//  {
+//   int leverrage=AccountInfoInteger(ACCOUNT_LEVERAGE);
+//   double openPrice=NormalizeDouble(tradeInfo.entryPrice, Digits());
+//   double stopPrice=NormalizeDouble(tradeInfo.stopPrice, Digits());
+////--- 计算仓位
+//   double lot=0;
+////USD在后面的直盘:EURUSD
+//   if(StringFind(_Symbol,"USD") > 0)
+//     {
+//      lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize),2);
+//     }
+////USD在前面的直盘:USDJPY
+//   else
+//      if(StringFind(_Symbol,"USD") == 0)
+//        {
+//         lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize/openPrice),2);
+//        }
+//      //交叉盘:NZDJPY
+//      else
+//         if(StringFind(_Symbol,"USD") <= 0)
+//           {
+//            string symbol=StringSubstr(_Symbol,0,3)+"USD";
+//            MqlTick tick;
+//            SymbolInfoTick(symbol, tick);
+//            double tickask=NormalizeDouble(tick.ask,SymbolInfoInteger(symbol,SYMBOL_DIGITS));
+//            lot=NormalizeDouble(StopLimit/(MathAbs(openPrice-stopPrice)*ContractSize*tickask/openPrice),2);
+//           }
+////边界检查
+//   double minvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN);
+//   if(lot<minvol)
+//      lot=minvol;
+//
+//   double maxvol=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MAX);
+//   if(lot>maxvol)
+//      lot=maxvol;
+////--- return trading volume
+//   return(lot);
+//  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double TradeSizeOptimized(void)
+  {
+   int leverrage=AccountInfoInteger(ACCOUNT_LEVERAGE);
+   double openPrice=NormalizeDouble(tradeInfo.entryPrice, Digits());
+   double stopPrice=NormalizeDouble(tradeInfo.stopPrice, Digits());
+   double lotSize=0.0;
+// 获取合约单位值（每点的价值）
+   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+   double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+// 计算每手每点的亏损金额
+   double lossPerLot = MathAbs(openPrice-stopPrice) * tickValue / tickSize;
+
+// 计算手数
+   if(lossPerLot > 0)
+      lotSize = StopLimit / lossPerLot;
+
+// 对手数进行调整，确保不超过最小、最大交易手数
+   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+
+// 四舍五入到最接近的合法手数
+   lotSize = MathFloor(lotSize / lotStep) * lotStep;
+   lotSize = MathMax(minLot, MathMin(lotSize, maxLot));
+   return(lotSize);
+  }
+//格式化TradeInfo价格位数
+void FormatTradeInfo()
+  {
+   if(tradeInfo.entryPrice!=NULL)
+     {
+      tradeInfo.entryPrice=NormalizeDouble(tradeInfo.entryPrice,Digits());
+     }
+   if(tradeInfo.outPrice!=NULL)
+     {
+      tradeInfo.outPrice=NormalizeDouble(tradeInfo.outPrice,Digits());
+     }
+   if(tradeInfo.stopPrice!=NULL)
+     {
+      tradeInfo.stopPrice=NormalizeDouble(tradeInfo.stopPrice,Digits());
+     }
+   if(tradeInfo.moveStopPrice!=NULL)
+     {
+      tradeInfo.moveStopPrice=NormalizeDouble(tradeInfo.moveStopPrice,Digits());
+     }
+   if(tradeInfo.profitRatio!=NULL)
+     {
+      tradeInfo.profitRatio=NormalizeDouble(tradeInfo.profitRatio,2);
+     }
+  }
+//生成备注
+string Remark()
+  {
+   return StringFormat("%s_%s_%s_%s_%d", StrategyName,_Symbol,StringSubstr(EnumToString(_Period),7),StringSubstr(EnumToString(MainTimeFrames),7),Serial);
+  }
+//+------------------------------------------------------------------+
+//| Check for open position conditions                               |
+//+------------------------------------------------------------------+
+void CheckForOpen(void)
+  {
+   if(IsPostioned==true)
+     {
+      return;
+     }
+//获取当前K线数据
+   MqlRates rt[2];
+//--- go trading only for first ticks of new bar
+   if(CopyRates(_Symbol,_Period,0,2,rt)!=2)
+     {
+      Print("CopyRates of ",_Symbol," failed, no history");
+      return;
+     }
+   if(rt[1].tick_volume>1)
+      return;
+   MqlRates current=rt[0];
+//测试用时间断点
+   if(current.time==StringToTime("2021.01.01 00:00:00"))
+     {
+      printf("进入断点");
+     }
+//--- 获取均线组数据判断趋势
+   double   ma30[2];
+   if(CopyBuffer(ExtHandleMa30,0,0,2,ma30)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma35[2];
+   if(CopyBuffer(ExtHandleMa35,0,0,2,ma35)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma40[2];
+   if(CopyBuffer(ExtHandleMa40,0,0,2,ma40)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma45[2];
+   if(CopyBuffer(ExtHandleMa45,0,0,2,ma45)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   ma50[2];
+   if(CopyBuffer(ExtHandleMa50,0,0,2,ma50)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   bandsMid[2];
+   if(CopyBuffer(ExtHandleBands,0,0,2,bandsMid)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandsUpper[2];
+   if(CopyBuffer(ExtHandleBands,1,0,2,bandsUpper)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   bandslower[2];
+   if(CopyBuffer(ExtHandleBands,2,0,2,bandslower)!=2)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+   double   mainMa30[2];
+   if(CopyBuffer(ExtHandleMainMa30,0,0,2,mainMa30)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa35[2];
+   if(CopyBuffer(ExtHandleMainMa35,0,0,2,mainMa35)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa40[2];
+   if(CopyBuffer(ExtHandleMainMa40,0,0,2,mainMa40)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa45[2];
+   if(CopyBuffer(ExtHandleMainMa45,0,0,2,mainMa45)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMa50[2];
+   if(CopyBuffer(ExtHandleMainMa50,0,0,2,mainMa50)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+   double   mainMacdDifLine[2];
+   if(CopyBuffer(ExtHandleMainMacd,2,0,2,mainMacdDifLine)!=2)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+   double   mainMacdDeaLine[2];
+   if(CopyBuffer(ExtHandleMainMacd,4,0,2,mainMacdDeaLine)!=2)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+//--- 检查是否开仓
+   bool signal=false;
+   ENUM_ORDER_TYPE direction=WRONG_VALUE; //开仓方向
+//1.判断大周期金叉还是死叉,并且是否要跟主周期均线相同
+   int cross = 0;
+   if(mainMacdDifLine[0]>mainMacdDeaLine[0] && MathAbs(mainMacdDifLine[0]-mainMacdDeaLine[0])>MacdMinPoint)
+     {
+      cross = 1;
+     }
+   else
+      if(mainMacdDifLine[0]<mainMacdDeaLine[0] && MathAbs(mainMacdDeaLine[0]-mainMacdDifLine[0])>MacdMinPoint)
+        {
+         cross = -1;
+        }
+   if(cross==0)
+     {
+      return;
+     }
+//2.判断是否满足开仓前置条件(1.交易周期出现过对应的趋势:多头趋势(金叉)或者空头趋势(死叉),2.主周期出现条件后,小周期走的K线数量是否超过规定的最大数量)
+   bool canPostionInCurrentState=false;
+   if(CrossState!=cross)  //如果出现了金叉死叉转换,重置条件
+     {
+      CurrentOutOfRangeBarCount=CrossState==0?CalcOutOfRangeBarCount():0; //如果CrossState为0表示,刚开启EA,有可能macd已经交叉走了很远,需要更新CurrentOutOfRangeBarCount的实际数量
+      CrossState=cross;
+      IsOpenTrend=false;
+      CrossBandsOtherSide=false;
+      TradeTimeInCurrentCross=0;
+      ResetState();
+     }
+   double mainMa[]= {mainMa30[0],mainMa35[0],mainMa40[0],mainMa45[0],mainMa50[0]};
+   int mainMaSequence=CalcMaSequence(mainMa);
+//均线多头需要金叉,均线空头需要死叉
+   if(FollowMainMaSequence&&(mainMaSequence!=CrossState))
+     {
+      return;
+     }
+//交易周期出现对应趋势
+   double ma[]= {ma30[0],ma35[0],ma40[0],ma45[0],ma50[0]};
+   int maSequence=CalcMaSequence(ma);
+   if(maSequence==CrossState)
+     {
+      IsOpenTrend=true;
+     }
+//K线数量是否超过最大数量
+   if((!OpenTrendEnable || IsOpenTrend) && (OutOfRangeBarCount==-1 || ++CurrentOutOfRangeBarCount<OutOfRangeBarCount) && (MaxTradeTimePerCross==-1 || TradeTimeInCurrentCross<MaxTradeTimePerCross))
+     {
+      canPostionInCurrentState=true;
+     }
+   if(!canPostionInCurrentState)
+     {
+      return;
+     }
+//3.判断是否触碰布林带出现入场条件
+   if(CrossState==-1)
+      direction=ORDER_TYPE_SELL;    // sell conditions
+   else
+      if(CrossState==1)
+        {
+         direction=ORDER_TYPE_BUY;  // buy conditions
+        }
+//如果之前没有出现穿越布林带,判断是否穿过了布林带的上轨跟下轨(多头下轨,空头上轨)
+   if(IsCrossed==false)
+     {
+      if(direction==ORDER_TYPE_SELL)
+        {
+         if(bandsUpper[0]<=current.high)
+           {
+            IsCrossed=true;
+            OpenStopPrice=current.high;
+           }
+        }
+      if(direction==ORDER_TYPE_BUY)
+        {
+         if(current.low<= bandslower[0])
+           {
+            IsCrossed=true;
+            OpenStopPrice=current.low;
+           }
+        }
+     }
+//如果已经出现穿越,则看当前是否是收出了阳线(做多)或者阴线(做空),符合条件就进场
+//进场条件为多头排列时,价格下穿布林带下轨后收出回到布林带中第一个阳线,空头排列时,价格上
+//穿布林带上轨后收出回到布林带中第一个阴线
+   if(IsCrossed==true)
+     {
+      //出现了穿过布林带,判断当前是否还是正在布林带上,如果在,更新止损价格,如果回到布林带上并收反向K线进场,如果完全偏离出布林带放弃这次
+      if(direction==ORDER_TYPE_SELL)
+        {
+         //只要收出阴线,阴线要符合实体要求且阴线没有穿过布林带中线进场,阳线继续更新止损价
+         if(current.open<=current.close)
+           {
+            OpenStopPrice=fmax(current.high, OpenStopPrice);
+           }
+         if(current.open>current.close&&(current.open-current.close)>EntryBarMinPoint*SymbolPoint)
+           {
+            if(current.close>bandsMid[0])
+              {
+               OpenStopPrice=fmax(current.high, OpenStopPrice);
+               tradeInfo.stopPrice=OpenStopPrice+(StopPoint*SymbolPoint);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=current.close;
+               tradeInfo.lot=TradeSizeOptimized();
+               tradeInfo.direction=2;
+               tradeInfo.entryTime=TimeLocal();
+               signal=true;
+              }
+            else
+              {
+               ResetState();
+              }
+           }
+        }
+      if(direction==ORDER_TYPE_BUY)
+        {
+         //只要收出阳线,阳线要符合实体要求且阳线没有穿过布林带中线进场,阴线继续更新止损价
+         if(current.open>=current.close)
+           {
+            OpenStopPrice=fmin(current.low, OpenStopPrice);
+           }
+         if(current.open<current.close&&(current.close-current.open)>EntryBarMinPoint*SymbolPoint)
+           {
+            if(current.close<bandsMid[0])
+              {
+               OpenStopPrice=fmin(current.low, OpenStopPrice);
+               tradeInfo.stopPrice=OpenStopPrice-(StopPoint*SymbolPoint);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=current.close;
+               tradeInfo.direction=1;
+               tradeInfo.lot=TradeSizeOptimized();
+               tradeInfo.entryTime=TimeLocal();
+               signal=true;
+              }
+            else
+              {
+               ResetState();
+              }
+           }
+        }
+     }
+//--- 开仓
+   if(direction!=WRONG_VALUE && signal)
+     {
+      if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && Bars(_Symbol,_Period)>100)
+        {
+         FormatTradeInfo();
+         Serial=Serial+1;
+         //循环开仓,确保开成功
+         int i=1;
+         do
+           {
+            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),tradeInfo.stopPrice,0,Remark());
+            Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("Symbol:%s,Serial:%d,No.%d Open Position,ResultCode:%d",_Symbol,Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE)
+              {
+               break;
+              }
+            if(i>20)
+              {
+               //开仓失败,发送邮件
+               string text=StringFormat("Open Position Fail,%sAccount:%d,Symbol:%s,Serial:%d,ErrorCode:%d,ErrorContent:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,retCode,transReturnCode(retCode),Remark());
+               printf(text);
+               string title=StringFormat("Open Position Fail,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               //开仓失败重置状态,之后重新判断进场
+               ResetState();
+               return;
+              }
+           }
+         while(i<=20);
+
+         string text=StringFormat("Open Position Success,%sAccount:%d,Symbol:%s,Serial:%d,Lot:%.2f,Side:%s,Open Price:%f,StopLoss Price:%f,OpenTime:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "Short":"Long",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS),Remark());
+         printf(text);
+         //发送开仓邮件
+         string title=StringFormat("Open Position Success,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+         SendMail(title, text);
+         //发送开仓通知
+         SendNotification(text);
+         //开仓成功后需要把状态重置
+         ResetState();
+         TradeTimeInCurrentCross++;
+         //打印推BE信息
+         PrintBreakEven=true;
+         //更新全局变量
+         GlobalVariableSet(GlobalSerialName, Serial);
+         GlobalVariablesFlush();
+        }
+     }
+//---
+  }
+//+------------------------------------------------------------------+
+//|重置入场状态                                                      |
+//+------------------------------------------------------------------+
+void ResetState()
+  {
+   IsCrossed=false;
+   OpenStopPrice=0;
+  }
+//计算交叉过了多少根K线
+int CalcOutOfRangeBarCount()
+  {
+   int count=9999;
+   double   mainMacdDifLine[50];
+   if(CopyBuffer(ExtHandleMainMacd,2,0,50,mainMacdDifLine)!=50)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return 0;
+     }
+   double   mainMacdDeaLine[50];
+   if(CopyBuffer(ExtHandleMainMacd,4,0,50,mainMacdDeaLine)!=50)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return 0;
+     }
+//反向查找,直到出现一个交叉为止
+   int findCount=0;
+   int i,j;
+   for(i=49,j=48; i>2&&j>1;i--,j--)
+     {
+      if((mainMacdDeaLine[i]>mainMacdDifLine[i]&&mainMacdDeaLine[j]<mainMacdDifLine[j]) || (mainMacdDeaLine[i]<mainMacdDifLine[i]&&(mainMacdDeaLine[j]>mainMacdDifLine[j])))
+        {
+         if(findCount==0)
+           {
+            count=0;
+           }
+         else
+           {
+            if(_Period==PERIOD_H1&&MainTimeFrames==PERIOD_D1)
+              {
+               count = findCount*24;
+              }
+            else
+               if(_Period==PERIOD_H4&&MainTimeFrames==PERIOD_D1)
+                 {
+                  count = findCount*6;
+                 }
+               else
+                  if(_Period==PERIOD_H1&&MainTimeFrames==PERIOD_H4)
+                    {
+                     count = findCount*4;
+                    }
+           }
+         break;
+        }
+      findCount++;
+     }
+   return count;
+  }
+//判断均线多头还是空头
+int CalcMaSequence(double &ma[])
+  {
+//判断是否有值
+   for(int i=0; i<ArraySize(ma)-1; i++)
+     {
+      if(ma[i]==0)
+        {
+         return 0;
+        }
+     }
+//判断是否均线多头
+   bool isHigher=true;
+   for(int i=0; i<ArraySize(ma)-1; i++)
+     {
+      if(ma[i]<=ma[i+1])
+        {
+         isHigher=false;
+         break;
+        }
+     }
+   if(isHigher)
+     {
+      return 1;
+     }
+//判断是否均线空头
+   bool isLower=true;
+   for(int i=0; i<ArraySize(ma)-1; i++)
+     {
+      if(ma[i]>=ma[i+1])
+        {
+         isLower=false;
+         break;
+        }
+     }
+   if(isLower)
+     {
+      return -1;
+     }
+   return 0;
+  }
+//+------------------------------------------------------------------+
+//| Check for close position conditions                              |
+//+------------------------------------------------------------------+
+void CheckForClose(void)
+  {
+   if(IsPostioned==false)
+     {
+      return;
+     }
+//主周期指标数据
+   MqlRates rt[1];
+   if(CopyRates(_Symbol,MainTimeFrames,0,1,rt)!=1)
+     {
+      Print("CopyRates of ",_Symbol," failed, no history");
+      return;
+     }
+   double   mainBandsMid[2];
+   if(CopyBuffer(ExtHandleMainBands,0,0,2,mainBandsMid)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   mainBandsUpper[2];
+   if(CopyBuffer(ExtHandleMainBands,1,0,2,mainBandsUpper)!=2)
+     {
+      Print("CopyBuffer from iBands upper failed, no data");
+      return;
+     }
+   double   mainBandslower[2];
+   if(CopyBuffer(ExtHandleMainBands,2,0,2,mainBandslower)!=2)
+     {
+      Print("CopyBuffer from iBands lower failed, no data");
+      return;
+     }
+   double   mainAtr[2];
+   if(CopyBuffer(ExtHandleMainAtr,0,0,2,mainAtr)!=2)
+     {
+      Print("CopyBuffer from iMA failed, no data");
+      return;
+     }
+//获取当前报价
+   MqlTick tick;
+   if(!SymbolInfoTick(_Symbol, tick))
+     {
+      Print("SymbolInfoTick of ",_Symbol," failed, no tick");
+      return;
+     }
+//测试时间用断点
+   if(tick.time==StringToTime("2022.01.28 10:00:00"))
+     {
+      printf("进入断点");
+     }
+//--- 判断是否需要平仓
+   bool signal=false;
+//判断出场条件, 1.最近20日线的ATR做移动止损,2.跌破主周期布林带的中轨,3.达到设定的止盈
+   if(tradeInfo.direction==1)
+     {
+      double bid=SymbolInfoDouble(_Symbol,SYMBOL_BID);
+      if(bid>=mainBandsUpper[1])
+        {
+         CrossBandsOtherSide=true;
+        }
+      double closePrice=tradeInfo.moveStopPrice;
+      if(CloseWithMidBands&&CrossBandsOtherSide)
+        {
+         closePrice=fmax(closePrice,mainBandsMid[0]);
+        }
+      //判断移动止损
+      if(bid<=closePrice)
+        {
+         signal=true;
+        }
+      //实时盈亏比
+      double profitRatio = (bid-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+      //判断达到最大止盈
+      if(MaxWinProfitRatio!=-1 && profitRatio>=MaxWinProfitRatio)
+        {
+         signal=true;
+         string text=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set MaxProfitRatio:%f,TakeProfit Price:%f,Profit Points:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, MaxWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint),Remark());
+         printf(text);
+         string title=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+         SendMail(title, text);
+         SendNotification(text);
+        }
+      if(signal)
+        {
+         tradeInfo.outTime=TimeLocal();
+         tradeInfo.outPrice=bid;
+         tradeInfo.profitRatio=(tradeInfo.outPrice-tradeInfo.entryPrice)/(tradeInfo.entryPrice-tradeInfo.stopPrice);
+         tradeInfo.isWin=tradeInfo.profitRatio>0;
+        }
+      else
+        {
+         //推BE
+         if(ProfitProtectionRate!=0&&profitRatio>=ProfitProtectionRate)
+           {
+            tradeInfo.moveStopPrice=tradeInfo.entryPrice;
+            if(PrintBreakEven)
+              {
+               string text=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set BE profitRatio:%f,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice,Remark());
+               printf(text);
+               string title=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               PrintBreakEven=false;
+              }
+           }
+         //更新移动止损,当天日线开盘价的1.5倍ATR
+         double newMoveStopPrice = fmax(tradeInfo.moveStopPrice,rt[0].open-1.5*mainAtr[0]);
+         if(tradeInfo.moveStopPrice!=newMoveStopPrice)
+           {
+            tradeInfo.moveStopPrice = newMoveStopPrice;
+            //发送移动止损更改信息
+            string text=StringFormat("Update StopLossPrice,%sAccount:%d,Symbol:%s,Serial:%d,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.moveStopPrice,Remark());
+            printf(text);
+            string title=StringFormat("Update StopLossPrice,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+            SendMail(title, text);
+            SendNotification(text);
+           }
+        }
+     }
+   else
+      if(tradeInfo.direction==2)
+        {
+         double ask=SymbolInfoDouble(_Symbol,SYMBOL_ASK);
+         if(ask<=mainBandslower[1])
+           {
+            CrossBandsOtherSide=true;
+           }
+         double closePrice=tradeInfo.moveStopPrice;
+         if(CloseWithMidBands&&CrossBandsOtherSide)
+           {
+            closePrice=fmin(closePrice,mainBandsMid[0]);
+           }
+         //判断止损
+         if(ask>=closePrice)
+           {
+            signal=true;
+           }
+         //实时盈亏比
+         double profitRatio = (tradeInfo.entryPrice-ask)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+         //判断达到最大止盈
+         if(MaxWinProfitRatio!=-1 && profitRatio>=MaxWinProfitRatio)
+           {
+            signal=true;
+            string text=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set TP profitRatio:%f,TakeProfit Price:%f,Profit Points:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, MaxWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint),Remark());
+            printf(text);
+            string title=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+            SendMail(title, text);
+            SendNotification(text);
+           }
+         if(signal)
+           {
+            tradeInfo.outTime=TimeLocal();
+            tradeInfo.outPrice=ask;
+            tradeInfo.profitRatio=(tradeInfo.entryPrice-tradeInfo.outPrice)/(tradeInfo.stopPrice-tradeInfo.entryPrice);
+            tradeInfo.isWin=tradeInfo.profitRatio>0;
+           }
+         else
+           {
+            //推BE
+            if(ProfitProtectionRate!=0&&profitRatio>=ProfitProtectionRate)
+              {
+               tradeInfo.moveStopPrice=tradeInfo.entryPrice;
+               if(PrintBreakEven)
+                 {
+                  string text=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set BE profitRatio:%f,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice,Remark());
+                  printf(text);
+                  string title=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+                  SendMail(title, text);
+                  SendNotification(text);
+                  PrintBreakEven=false;
+                 }
+              }
+            //更新移动止损,当天日线开盘价的1.5倍ATR
+            double newMoveStopPrice = fmin(tradeInfo.moveStopPrice,rt[0].open+1.5*mainAtr[0]);
+            if(tradeInfo.moveStopPrice!=newMoveStopPrice)
+              {
+               tradeInfo.moveStopPrice = newMoveStopPrice;
+               //发送移动止损更改信息
+               string text=StringFormat("Update StopLossPrice,%sAccount:%d,Symbol:%s,Serial:%d,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.moveStopPrice,Remark());
+               printf(text);
+               string title=StringFormat("Update StopLossPrice,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
+              }
+           }
+        }
+//--- 平仓
+   if(signal)
+     {
+      if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) && Bars(_Symbol,_Period)>100)
+        {
+         FormatTradeInfo();
+         //循环平仓,确保平掉
+         int i=1;
+         do
+           {
+            ExtTrade.PositionClose(_Symbol);
+            Sleep(500);
+            uint retCode=ExtTrade.ResultRetcode();
+            printf(StringFormat("Symbol:%s,Serial:%d,No.%d Close Position,ResultCode:%d",_Symbol,Serial,i++,retCode));
+            if(retCode==TRADE_RETCODE_DONE||retCode==TRADE_RETCODE_POSITION_CLOSED)
+              {
+               break;
+              }
+            if(i>20)
+              {
+               //平仓失败,发送邮件
+               string text=StringFormat("Close Position Fail,%sAccount:%d,Symbol:%s,Serial:%d,ErrorCode:%d,ErrorContent:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,retCode,transReturnCode(retCode),Remark());
+               printf(text);
+               string title=StringFormat("Close Position Fail,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
+               return;
+              }
+           }
+         while(i<=20);
+         //发送平仓邮件
+         string text=StringFormat("Close Position Success,%sAccount:%d,Symbol:%s,Serial:%d,Close Price:%f,Side:%s,ProfitRatio:%.2f,Status:%s,CloseTime:%s,HoldingTime:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.outPrice,
+                                  tradeInfo.direction==ORDER_TYPE_SELL ? "Long":"Short",tradeInfo.profitRatio,tradeInfo.isWin?"Win":"Loss",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS),FormatHoldingTime(tradeInfo.entryTime,tradeInfo.outTime),Remark());
+         printf(text);
+         //发送平仓邮件
+         string title=StringFormat("Close Position Success,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+         SendMail(title, text);
+         //发送平仓通知
+         SendNotification(text);
+        }
+     }
+//---
+  }
+//计算并格式化持仓时间
+string FormatHoldingTime(datetime openTime,datetime closeTime)
+  {
+   return FormatHoldingTime((int)(closeTime - openTime));
+  }
+//计算并格式化持仓时间
+string FormatHoldingTime(int totalSeconds)
+  {
+   int days    = totalSeconds / 86400;
+   int hours   = (totalSeconds % 86400) / 3600;
+   int minutes = (totalSeconds % 3600) / 60;
+   if(days>0)
+     {
+      return StringFormat("%dd%dh%dm", days, hours, minutes);
+     }
+   else
+      if(hours>0)
+        {
+         return StringFormat("%dh%dm", hours, minutes);
+        }
+      else
+        {
+         return StringFormat("%dm", minutes);
+        }
+  }
+//错误代码翻译
+string transReturnCode(uint returnCode)
+  {
+   if(returnCode==TRADE_RETCODE_NO_MONEY)
+     {
+      return "资金(保证金)不足";
+     }
+   if(returnCode==TRADE_RETCODE_POSITION_CLOSED)
+     {
+      return "持仓已关闭";
+     }
+   if(returnCode==TRADE_RETCODE_MARKET_CLOSED)
+     {
+      return "收市";
+     }
+   if(returnCode==TRADE_RETCODE_REQUOTE)
+     {
+      return "重新报价";
+     }
+   if(returnCode==TRADE_RETCODE_CONNECTION)
+     {
+      return "与服务器无连接";
+     }
+   if(returnCode==TRADE_RETCODE_LIMIT_ORDERS)
+     {
+      return "待办订单数量达到限制";
+     }
+   if(returnCode==TRADE_RETCODE_REJECT)
+     {
+      return "拒绝请求";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID)
+     {
+      return "无效请求";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_VOLUME)
+     {
+      return "无效成交量";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_PRICE)
+     {
+      return "无效价格";
+     }
+   if(returnCode==TRADE_RETCODE_INVALID_STOPS)
+     {
+      return "无效止损价";
+     }
+   if(returnCode==TRADE_RETCODE_TRADE_DISABLED)
+     {
+      return "关闭交易";
+     }
+   if(returnCode==TRADE_RETCODE_TOO_MANY_REQUESTS)
+     {
+      return "太频繁的请求";
+     }
+   return "未知错误";
+  }
+//+------------------------------------------------------------------+
+//| Position select depending on netting or hedging                  |
+//+------------------------------------------------------------------+
+bool SelectPosition()
+  {
+   bool res=false;
+//--- check position in Hedging mode
+   if(ExtHedging)
+     {
+      uint total=PositionsTotal();
+      string findstr=StringFormat("%s_%s_%s_%s", StrategyName,_Symbol,StringSubstr(EnumToString(_Period),7),StringSubstr(EnumToString(MainTimeFrames),7));
+      for(uint i=0; i<total; i++)
+        {
+         string position_symbol=PositionGetSymbol(i);
+         if(_Symbol==position_symbol && MA_MAGIC==PositionGetInteger(POSITION_MAGIC) && StringFind(PositionGetString(POSITION_COMMENT),findstr)!=-1)
+           {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
+            res=true;
+            break;
+           }
+        }
+     }
+//--- check position in Netting mode
+   else
+     {
+      if(!PositionSelect(_Symbol))
+         return(false);
+      else
+         if(PositionGetInteger(POSITION_MAGIC)==MA_MAGIC) //---check Magic number
+           {
+            //填充持仓方向.开仓价位,止损价位等
+            if(tradeInfo.direction==0)
+              {
+               tradeInfo.direction=PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY ? 1:2;
+               tradeInfo.stopPrice=PositionGetDouble(POSITION_SL);
+               tradeInfo.moveStopPrice=tradeInfo.stopPrice;
+               tradeInfo.entryPrice=PositionGetDouble(POSITION_PRICE_OPEN);
+               tradeInfo.lot=PositionGetDouble(POSITION_VOLUME);
+               string comment=PositionGetString(POSITION_COMMENT);
+               if(comment!="")
+                 {
+                  Serial=StringToInteger(comment);
+                 }
+              }
+            return true;
+           }
+      return(false);
+     }
+//--- result for Hedging mode
+   return(res);
+  }
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit(void)
+  {
+//--- prepare trade class to control positions if hedging mode is active
+   ExtHedging=((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE)==ACCOUNT_MARGIN_MODE_RETAIL_HEDGING);
+   ExtTrade.SetExpertMagicNumber(MA_MAGIC);
+   ExtTrade.SetMarginMode();
+   ExtTrade.SetTypeFillingBySymbol(Symbol());
+   ContractSize=SymbolInfoDouble(_Symbol,SYMBOL_TRADE_CONTRACT_SIZE);
+   SymbolPoint=SymbolInfoDouble(_Symbol,SYMBOL_POINT);
+   AccountId=AccountInfoInteger(ACCOUNT_LOGIN);
+   IsRealAccount=AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_REAL;
+//初始化指标数据
+//本周期指标加载
+   ExtHandleMa30=iMA(_Symbol,_Period,30,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa35=iMA(_Symbol,_Period,35,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa40=iMA(_Symbol,_Period,40,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa45=iMA(_Symbol,_Period,45,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMa50=iMA(_Symbol,_Period,50,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleBands=iBands(_Symbol,_Period,20,0,2,PRICE_CLOSE);
+//大周期指标加载
+   ExtHandleMainMa30=iMA(_Symbol,MainTimeFrames,30,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa35=iMA(_Symbol,MainTimeFrames,35,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa40=iMA(_Symbol,MainTimeFrames,40,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa45=iMA(_Symbol,MainTimeFrames,45,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainMa50=iMA(_Symbol,MainTimeFrames,50,0,MODE_EMA,PRICE_CLOSE);
+   ExtHandleMainBands=iBands(_Symbol,MainTimeFrames,20,0,2,PRICE_CLOSE);
+//ExtHandleMainMacd=iCustom(_Symbol,MainTimeFrames,"Free Indicators\\MACDDouble",5,13,5,PRICE_MEDIAN);
+   ExtHandleMainMacd=iCustom(_Symbol,MainTimeFrames,"Free Indicators\\MACDDouble");
+   ExtHandleMainAtr=iATR(_Symbol,MainTimeFrames,20);
+//加载全局序号
+   GlobalSerialName=StringFormat("%s_%s_%d_Serial",_Symbol,StringSubstr(EnumToString(_Period),7),MA_MAGIC);
+   if(GlobalVariableCheck(GlobalSerialName))
+     {
+      Serial=GlobalVariableGet(GlobalSerialName);
+     }
+//是否有仓位
+   IsPostioned=SelectPosition();
+//--- ok
+   return(INIT_SUCCEEDED);
+  }
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick(void)
+  {
+//---
+   IsPostioned=SelectPosition();
+   if(IsPostioned)
+      CheckForClose();
+   else
+      CheckForOpen();
+//---
+  }
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+  }
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Trade function                                                   |
+//+------------------------------------------------------------------+
+void OnTrade()
+  {
+//---
+
+  }
+//+------------------------------------------------------------------+
+//| TradeTransaction function                                        |
+//+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction& trans,
+                        const MqlTradeRequest& request,
+                        const MqlTradeResult& result)
+  {
+//---
+
+  }
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+

@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2000-2023, Alex zhang."
 #property link      "im.zhangjf@gmail.com"
-#property version   "1.00"
+#property version   "1.01"
 
 #include <Trade\Trade.mqh>
 
@@ -34,10 +34,10 @@ input double StopLimit= 100.00;    // 最大止损金额
 input int StopPoint=0;    // 止损加点数,在止损基础上增加的保护点数,只对初始止损有效
 input bool FollowMainFrameTrend=true; //突破趋势方向是否需要跟主周期一致,true:需要,false:不需要
 input ENUM_TIMEFRAMES MainTimeFrames=PERIOD_H1; //主均线周期,默认:天
-input double ProfitProtectionRate=0.5; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位,0为不推BE
+input double ProfitProtectionRate=0.5; //推BE盈亏比,价格达到多少倍盈亏比时,将止损移动到入场位置,0为不推BE
 input double StopWinProfitRatio=1; //主动止盈的最大盈亏比,达到该盈亏比后进行止盈,为0表示不主动止盈
 input double TradeRangeLowestPoint=200; //有效的交易区间最低点数
-input double TradeRangeHighestPoint=850; //有效的交易区间最高点数
+input double TradeRangeHighestPoint=750; //有效的交易区间最高点数
 input int TradeRangeTimeBegin=1; //判定交易区间的开始时间(交易服务器时间)
 input int TradeRangeTimeEnd=5; //判定交易区间的结束时间(交易服务器时间)
 input int NoTradeTimeBegin=-1; //不进行交易的时间起,包含(单位:hour,交易服务器时间),-1表示全部时间段都进行交易
@@ -76,6 +76,7 @@ bool   PrintRangePoint=false;   //输出RangePoint信息
 bool   PrintBreakEven=false;    //输出breakeven信息
 
 bool   ExtHedging=false;
+string StrategyName="RangeBreakOut"; //策略名称
 //统计参数
 uint   HoldingCrossDayCount=0; //持仓过夜的交易数
 uint   TpCount=0; //止盈交易总数
@@ -90,7 +91,7 @@ uint   CurrentLosingStreak=0; //当前连败次数
 CTrade ExtTrade;
 TradeInfo tradeInfo;
 
-#define MA_MAGIC 39518605
+#define MA_MAGIC 39518601
 
 //计算点值
 double SymbolPointValue(void)
@@ -187,6 +188,11 @@ void FormatTradeInfo()
       tradeInfo.profitRatio=NormalizeDouble(tradeInfo.profitRatio,2);
      }
   }
+//生成备注
+string Remark()
+  {
+   return StringFormat("%s_%s_%d", StrategyName, _Symbol, Serial);
+  }
 //+------------------------------------------------------------------+
 //| Check for open position conditions                               |
 //+------------------------------------------------------------------+
@@ -247,10 +253,18 @@ void CheckForOpen(void)
      {
       if(PrintRangePoint&&TradeRangePoint!=0)
         {
-         printf("TradeRangePoint: %f,TradeRangeHighPrice: %f,TradeRangeLowPrice: %f,未达到开仓条件",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
+         printf("TradeRangePoint: %f,TradeRangeHighPrice: %f,TradeRangeLowPrice: %f,Opening conditions are not met",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
          PrintRangePoint=false;
         }
       return;
+     }
+   else
+     {
+      if(PrintRangePoint)
+        {
+         printf("TradeRangePoint: %f,TradeRangeHighPrice: %f,TradeRangeLowPrice: %f,Meet the opening conditions",TradeRangePoint,TradeRangeHighPrice,TradeRangeLowPrice);
+         PrintRangePoint=false;
+        }
      }
 //如果在非交易时间范围内,不进行交易
    if(NoTradeTimeBegin!=-1&&NoTradeTimeEnd!=-1)
@@ -388,11 +402,11 @@ void CheckForOpen(void)
      {
       return;
      }
-//步骤二.判断是否需要跟主周期趋势方向一致
-   double ma[]= {ma35[0],ma40[0],ma45[0],ma50[0],ma60[0]};
+//步骤二.判断是否需要跟主周期趋势方向一致，均线目前只使用35,40,45,50
+   double ma[]= {ma35[0],ma40[0],ma45[0],ma50[0]};
    int maSequence=CalcMaSequence(ma);
-//大周期均线排列
-   double mainMa[]= {mainMa35[0],mainMa40[0],mainMa45[0],mainMa50[0],mainMa60[0]};
+//大周期均线排列，均线目前只使用35,40,45,50
+   double mainMa[]= {mainMa35[0],mainMa40[0],mainMa45[0],mainMa50[0]};
    int mainMaSequence=CalcMaSequence(mainMa);
 //是否跟主周期一致
    if(FollowMainFrameTrend==false||(direction==ORDER_TYPE_BUY&&mainMaSequence==1)||(direction==ORDER_TYPE_SELL&&mainMaSequence==-1))
@@ -428,10 +442,10 @@ void CheckForOpen(void)
          int i=1;
          do
            {
-            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),stopPrice,0,IntegerToString(Serial));
+            ExtTrade.PositionOpen(_Symbol,direction,tradeInfo.lot,SymbolInfoDouble(_Symbol,direction==ORDER_TYPE_SELL ? SYMBOL_BID:SYMBOL_ASK),stopPrice,0,Remark());
             Sleep(500);
             uint retCode=ExtTrade.ResultRetcode();
-            printf(StringFormat("品种:%s_%s,编号:%d,第%d次开仓,开仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            printf(StringFormat("Symbol:%s,Serial:%d,No.%d Open Position,ResultCode:%d",_Symbol,Serial,i++,retCode));
             if(retCode==TRADE_RETCODE_DONE)
               {
                break;
@@ -439,9 +453,9 @@ void CheckForOpen(void)
             if(i>20)
               {
                //开仓失败,发送邮件
-               string text=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
+               string text=StringFormat("Open Position Fail,%sAccount:%d,Symbol:%s,Serial:%d,ErrorCode:%d,ErrorContent:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,retCode,transReturnCode(retCode),Remark());
                printf(text);
-               string title=StringFormat("开仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               string title=StringFormat("Open Position Fail,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
                SendMail(title, text);
                SendNotification(text);
                return;
@@ -453,10 +467,10 @@ void CheckForOpen(void)
          //打印推BE信息
          PrintBreakEven=true;
          //通知
-         string text=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d,开仓数量:%.2f,方向:%s,开仓价格:%f,止损价格:%f,开仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "卖开":"买开",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS));
+         string text=StringFormat("Open Position Success,%sAccount:%d,Symbol:%s,Serial:%d,Lot:%.2f,Side:%s,Open Price:%f,StopLoss Price:%f,OpenTime:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.lot,direction==ORDER_TYPE_SELL ? "Short":"Long",tradeInfo.entryPrice,tradeInfo.stopPrice,TimeToString(tradeInfo.entryTime, TIME_DATE|TIME_SECONDS),Remark());
          printf(text);
          //发送开仓邮件
-         string title=StringFormat("开仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("Open Position Success,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
          SendMail(title, text);
          //发送开仓通知
          SendNotification(text);
@@ -480,7 +494,7 @@ int CalcMaSequence(double &ma[])
      }
 //判断是否均线多头
    bool isHigher=true;
-   for(int i=0; i<ArraySize(ma)-2; i++)
+   for(int i=0; i<ArraySize(ma)-1; i++)
      {
       if(ma[i]<=ma[i+1])
         {
@@ -494,7 +508,7 @@ int CalcMaSequence(double &ma[])
      }
 //判断是否均线空头
    bool isLower=true;
-   for(int i=0; i<ArraySize(ma)-2; i++)
+   for(int i=0; i<ArraySize(ma)-1; i++)
      {
       if(ma[i]>=ma[i+1])
         {
@@ -616,7 +630,11 @@ void CheckForClose(void)
               }
             if(PrintBreakEven)
               {
-               printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
+               string text=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set BE profitRatio:%f,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice,Remark());
+               printf(text);
+               string title=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
                PrintBreakEven=false;
               }
            }
@@ -633,7 +651,11 @@ void CheckForClose(void)
             tradeInfo.profitRatio=profitRatio;
             tradeInfo.isWin=1;
             signal=true;
-            printf("Take Profit,盈亏比:%f,达到设定止盈盈亏比:%f,止盈价位:%f,盈利点数:%f", profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint));
+            string text=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set TP profitRatio:%f,TakeProfit Price:%f,Profit Points:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint),Remark());
+            printf(text);
+            string title=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+            SendMail(title, text);
+            SendNotification(text);
            }
         }
      }
@@ -665,7 +687,11 @@ void CheckForClose(void)
                  }
                if(PrintBreakEven)
                  {
-                  printf("BreankEven,盈亏比:%f,达到设定BE盈亏比:%f,移动止损至入场价位:%f", profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice);
+                  string text=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set BE profitRatio:%f,Move SL price to:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, ProfitProtectionRate,tradeInfo.moveStopPrice,Remark());
+                  printf(text);
+                  string title=StringFormat("BreakEven,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+                  SendMail(title, text);
+                  SendNotification(text);
                   PrintBreakEven=false;
                  }
               }
@@ -682,7 +708,11 @@ void CheckForClose(void)
                tradeInfo.profitRatio=profitRatio;
                tradeInfo.isWin=1;
                signal=true;
-               printf("Take Profit,盈亏比:%f,达到设定止盈盈亏比:%f,止盈价位:%f,盈利点数:%f", profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint));
+               string text=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d,ProfitRatio:%f,Reach the set TP profitRatio:%f,TakeProfit Price:%f,Profit Points:%f,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,profitRatio, StopWinProfitRatio,tradeInfo.outPrice,MathAbs((tradeInfo.outPrice-tradeInfo.entryPrice)/SymbolPoint),Remark());
+               printf(text);
+               string title=StringFormat("TakeProfit,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
+               SendMail(title, text);
+               SendNotification(text);
               }
            }
         }
@@ -699,7 +729,7 @@ void CheckForClose(void)
             ExtTrade.PositionClose(_Symbol);
             Sleep(500);
             uint retCode=ExtTrade.ResultRetcode();
-            printf(StringFormat("品种:%s_%s,编号:%d,第%d次平仓,平仓结果代码:%d",_Symbol,StringSubstr(EnumToString(_Period),7),Serial,i++,retCode));
+            printf(StringFormat("Symbol:%s,Serial:%d,No.%d Close Position,ResultCode:%d",_Symbol,Serial,i++,retCode));
             if(retCode==TRADE_RETCODE_DONE||retCode==TRADE_RETCODE_POSITION_CLOSED)
               {
                break;
@@ -707,9 +737,9 @@ void CheckForClose(void)
             if(i>20)
               {
                //平仓失败,发送邮件
-               string text=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d,错误代码:%d,错误内容:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,retCode,transReturnCode(retCode));
+               string text=StringFormat("Close Position Fail,%sAccount:%d,Symbol:%s,Serial:%d,ErrorCode:%d,ErrorContent:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,retCode,transReturnCode(retCode),Remark());
                printf(text);
-               string title=StringFormat("平仓失败,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+               string title=StringFormat("Close Position Fail,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
                SendMail(title, text);
                SendNotification(text);
                return;
@@ -718,11 +748,11 @@ void CheckForClose(void)
          while(i<=20);
          //通知
          //发送平仓邮件
-         string text=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d,平仓价格:%f,方向:%s,盈亏比:%.2f,交易结果:%s,平仓时间:%s,持仓时间:%s",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial,tradeInfo.outPrice,
-                                  tradeInfo.direction==ORDER_TYPE_SELL ? "买平":"卖平",tradeInfo.profitRatio,tradeInfo.isWin==1?"TP":tradeInfo.isWin==0?"BE":"SL",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS),FormatHoldingTime(tradeInfo.entryTime,tradeInfo.outTime));
+         string text=StringFormat("Close Position Success,%sAccount:%d,Symbol:%s,Serial:%d,Close Price:%f,Side:%s,ProfitRatio:%.2f,Status:%s,CloseTime:%s,HoldingTime:%s,Remark:%s",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial,tradeInfo.outPrice,
+                                  tradeInfo.direction==ORDER_TYPE_SELL ? "Long":"Short",tradeInfo.profitRatio,tradeInfo.isWin==1?"TP":tradeInfo.isWin==0?"BE":"SL",TimeToString(tradeInfo.outTime, TIME_DATE|TIME_SECONDS),FormatHoldingTime(tradeInfo.entryTime,tradeInfo.outTime),Remark());
          printf(text);
          //发送平仓邮件
-         string title=StringFormat("平仓成功,%s账号:%d,品种:%s_%s,编号:%d",IsRealAccount?"实盘":"模拟",AccountId,_Symbol,StringSubstr(EnumToString(_Period),7),Serial);
+         string title=StringFormat("Close Position Success,%sAccount:%d,Symbol:%s,Serial:%d",IsRealAccount?"Real":"Demo",AccountId,_Symbol,Serial);
          SendMail(title, text);
          //发送平仓通知
          SendNotification(text);
@@ -877,10 +907,11 @@ bool SelectPosition()
    if(ExtHedging)
      {
       uint total=PositionsTotal();
+      string findstr=StringFormat("%s_%s", StrategyName,_Symbol);
       for(uint i=0; i<total; i++)
         {
          string position_symbol=PositionGetSymbol(i);
-         if(_Symbol==position_symbol && MA_MAGIC==PositionGetInteger(POSITION_MAGIC))
+         if(_Symbol==position_symbol && MA_MAGIC==PositionGetInteger(POSITION_MAGIC) && StringFind(PositionGetString(POSITION_COMMENT),findstr)!=-1)
            {
             //填充持仓方向.开仓价位,止损价位等
             if(tradeInfo.direction==0)
